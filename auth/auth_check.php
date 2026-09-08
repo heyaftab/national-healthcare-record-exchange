@@ -63,6 +63,22 @@ function valid_roles(): array
     return ['Patient', 'Doctor', 'Pharmacist', 'Lab Technician', 'Hospital Admin', 'System Admin'];
 }
 
+/** Ensure every account has one stable, non-empty NHRE identifier. */
+function ensure_account_numbers(): void
+{
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+    $checked = true;
+
+    try {
+        db()->exec("UPDATE users SET account_number = CONCAT('NHRE-', LPAD(id, 8, '0')) WHERE account_number IS NULL OR TRIM(account_number) = ''");
+    } catch (PDOException $e) {
+        // Account pages still work during initial schema setup; retry on the next request.
+    }
+}
+
 /** Roles a visitor may self-select at registration. Administrative roles are provisioned only. */
 function self_service_roles(): array
 {
@@ -1284,4 +1300,5 @@ function log_record_access(?int $permission_id, int $patient_id, int $provider_i
     );
 }
 
+ensure_account_numbers();
 remember_me_login();

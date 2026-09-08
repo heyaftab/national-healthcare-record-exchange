@@ -4,9 +4,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/auth_check.php';
 require_role(['Hospital Admin']);
 
+$accountView = (string)($_POST['account_view'] ?? '');
+$viewRoles = ['Doctor' => ['Doctor'], 'Patient' => ['Patient'], 'staff' => ['Pharmacist', 'Lab Technician']];
+$returnPath = '../admin_credentials.php' . (isset($viewRoles[$accountView]) ? '?role=' . rawurlencode($accountView) : '');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['_csrf'] ?? null)) {
     $_SESSION['errors'] = ['Invalid account creation request.'];
-    redirect('../admin_credentials.php');
+    redirect($returnPath);
 }
 
 $fullname = trim((string)($_POST['fullname'] ?? ''));
@@ -23,6 +27,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Enter a valid email
 if (!preg_match('/^\\+?[0-9][0-9\\s().-]{7,19}$/', $phone)) $errors[] = 'Enter a valid phone number.';
 if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[\\W_]).{8,}$/', $password)) $errors[] = 'Temporary password must be 8+ characters and include upper/lowercase, a number, and a symbol.';
 if (!in_array($role, ['Patient', 'Doctor', 'Pharmacist', 'Lab Technician'], true)) $errors[] = 'Select a supported hospital account role.';
+if (isset($viewRoles[$accountView]) && !in_array($role, $viewRoles[$accountView], true)) $errors[] = 'Select an account role for this management workspace.';
 
 try {
     $pdo = db();
@@ -43,4 +48,4 @@ try {
 } catch (PDOException|RuntimeException $e) {
     $_SESSION['errors'] = [$e instanceof RuntimeException ? $e->getMessage() : 'Unable to create the account.'];
 }
-redirect('../admin_credentials.php');
+redirect($returnPath);

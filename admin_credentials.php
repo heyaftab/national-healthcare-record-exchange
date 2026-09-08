@@ -9,13 +9,26 @@ if ($role !== 'Hospital Admin') {
 
 $errors = session_pull('errors', []);
 $success = session_pull('success');
+$accountView = (string)($_GET['role'] ?? '');
+$roleViews = [
+    '' => ['title' => 'User account directory', 'description' => 'Create and manage patient, clinical, pharmacy, and laboratory accounts for your hospital.', 'roles' => ['Patient', 'Doctor', 'Pharmacist', 'Lab Technician']],
+    'Doctor' => ['title' => 'Doctor accounts', 'description' => 'Manage every registered doctor account in NHRE, including creating and removing accounts.', 'roles' => ['Doctor']],
+    'Patient' => ['title' => 'Patient accounts', 'description' => 'Manage every registered patient account in NHRE, including creating and removing accounts.', 'roles' => ['Patient']],
+    'staff' => ['title' => 'Hospital staff accounts', 'description' => 'Create and manage pharmacist and laboratory technician accounts for your hospital.', 'roles' => ['Pharmacist', 'Lab Technician']],
+];
+if (!isset($roleViews[$accountView])) {
+    $accountView = '';
+}
+$activeView = $roleViews[$accountView];
 
 try {
     $hospitalStmt = db()->prepare('SELECT hospital_id FROM users WHERE id = ? LIMIT 1');
     $hospitalStmt->execute([(int)$_SESSION['user_id']]);
     $hospitalId = (int)$hospitalStmt->fetchColumn();
-    $stmt = db()->prepare('SELECT id, fullname, email, role FROM users WHERE role IN (?, ?, ?, ?) AND hospital_id = ? ORDER BY role, fullname');
-    $stmt->execute(['Patient', 'Doctor', 'Pharmacist', 'Lab Technician', $hospitalId]);
+    $placeholders = implode(', ', array_fill(0, count($activeView['roles']), '?'));
+    $scope = in_array($accountView, ['Patient', 'Doctor'], true) ? '' : ' AND hospital_id = ?';
+    $stmt = db()->prepare("SELECT id, fullname, email, role FROM users WHERE role IN ($placeholders)$scope ORDER BY role, fullname");
+    $stmt->execute(in_array($accountView, ['Patient', 'Doctor'], true) ? $activeView['roles'] : [...$activeView['roles'], $hospitalId]);
     $accounts = $stmt->fetchAll();
 } catch (PDOException $e) {
     $errors[] = 'Unable to load user accounts.';
@@ -56,8 +69,8 @@ try {
       <div class="dashboard-hero glass-card">
         <div>
           <span class="auth-kicker">Admin-only access</span>
-          <h1>User account directory</h1>
-          <p>Create and manage patient, clinical, pharmacy, and laboratory accounts for your hospital.</p>
+          <h1><?= e($activeView['title']) ?></h1>
+          <p><?= e($activeView['description']) ?></p>
         </div>
       </div>
 
@@ -83,9 +96,10 @@ try {
             <p class="text-muted">New accounts are assigned to your hospital automatically.</p>
             <form action="auth/admin_account_create_process.php" method="POST" class="auth-form row g-3">
               <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+              <input type="hidden" name="account_view" value="<?= e($accountView) ?>">
               <div class="col-12"><input class="form-control" name="fullname" placeholder="Full name" required maxlength="150"></div>
               <div class="col-md-6"><input class="form-control" name="nid" placeholder="National ID" required inputmode="numeric" pattern="[0-9]{10,20}"></div>
-              <div class="col-md-6"><select class="form-select" name="role" required><option value="">Choose role</option><option>Patient</option><option>Doctor</option><option>Pharmacist</option><option>Lab Technician</option></select></div>
+              <div class="col-md-6"><select class="form-select" name="role" required><option value="">Choose role</option><?php foreach ($activeView['roles'] as $availableRole): ?><option value="<?= e($availableRole) ?>" <?= count($activeView['roles']) === 1 ? 'selected' : '' ?>><?= e($availableRole) ?></option><?php endforeach; ?></select></div>
               <div class="col-12"><input class="form-control" type="email" name="email" placeholder="Email address" required maxlength="190"></div>
               <div class="col-md-6"><input class="form-control" name="phone" placeholder="Phone number" required maxlength="20"></div>
               <div class="col-md-6"><input class="form-control" type="password" name="password" placeholder="Temporary password" required minlength="8"></div>
@@ -115,7 +129,7 @@ try {
                         <td><?= e($account['role']) ?></td>
                         <td><?= e($account['fullname']) ?></td>
                         <td><?= e($account['email']) ?></td>
-                        <td class="text-end"><form action="auth/admin_account_delete_process.php" method="POST" onsubmit="return confirm('Remove this account? This cannot be undone.');"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>"><input type="hidden" name="account_id" value="<?= (int)$account['id'] ?>"><button type="submit" class="btn btn-outline-danger btn-sm">Remove</button></form></td>
+                        <td class="text-end"><form action="auth/admin_account_delete_process.php" method="POST" onsubmit="return confirm('Remove this account? This cannot be undone.');"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>"><input type="hidden" name="account_view" value="<?= e($accountView) ?>"><input type="hidden" name="account_id" value="<?= (int)$account['id'] ?>"><button type="submit" class="btn btn-outline-danger btn-sm">Remove</button></form></td>
                       </tr>
                     <?php endforeach; ?>
                   <?php else: ?>

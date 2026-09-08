@@ -65,37 +65,37 @@ if ($sidebarRole === 'Patient') {
 } elseif ($sidebarRole === 'Hospital Admin') {
     $sidebarLinks = array_merge($sidebarLinks, [
         ['hospital_profile.php', 'fa-hospital', 'Hospital Profile'],
-        ['admin_credentials.php', 'fa-user-doctor', 'Doctors'],
-        ['admin_credentials.php', 'fa-user-group', 'Patients'],
-        ['admin_credentials.php', 'fa-users', 'Hospital Staff'],
-        ['coming_soon.php?feature=departments', 'fa-table-cells-large', 'Departments', true],
+        ['admin_credentials.php?role=Doctor', 'fa-user-doctor', 'Doctors'],
+        ['admin_credentials.php?role=Patient', 'fa-user-group', 'Patients'],
+        ['admin_credentials.php?role=staff', 'fa-users', 'Hospital Staff'],
+        ['admin_operations.php?view=departments', 'fa-table-cells-large', 'Departments'],
         ['appointments.php', 'fa-calendar-check', 'Appointments'],
-        ['coming_soon.php?feature=medical-records', 'fa-notes-medical', 'Medical Records', true],
+        ['admin_operations.php?view=medical-records', 'fa-notes-medical', 'Medical Records'],
         ['medical_tests.php', 'fa-flask-vial', 'Laboratory Services'],
-        ['coming_soon.php?feature=prescriptions', 'fa-pills', 'Prescriptions', true],
-        ['coming_soon.php?feature=access-requests', 'fa-shield-halved', 'Access Requests', true],
+        ['admin_operations.php?view=prescriptions', 'fa-pills', 'Prescriptions'],
+        ['admin_operations.php?view=access-requests', 'fa-shield-halved', 'Access Requests'],
         ['admin_credentials.php', 'fa-users-gear', 'Account Directory'],
-        ['coming_soon.php?feature=reports', 'fa-chart-column', 'Reports & Analytics', true],
-        ['coming_soon.php?feature=audit-logs', 'fa-clipboard-list', 'Audit Logs', true],
+        ['admin_operations.php?view=reports', 'fa-chart-column', 'Reports & Analytics'],
+        ['admin_operations.php?view=audit-logs', 'fa-clipboard-list', 'Audit Logs'],
     ]);
 } elseif ($sidebarRole === 'System Admin') {
     $sidebarLinks = array_merge($sidebarLinks, [
-        ['coming_soon.php?feature=user-management', 'fa-users-gear', 'User Management', true],
-        ['coming_soon.php?feature=organizations', 'fa-building', 'Healthcare Organizations', true],
-        ['coming_soon.php?feature=medical-records', 'fa-notes-medical', 'Medical Records', true],
+        ['admin_operations.php?view=user-management', 'fa-users-gear', 'User Management'],
+        ['admin_operations.php?view=organizations', 'fa-building', 'Healthcare Organizations'],
+        ['admin_operations.php?view=medical-records', 'fa-notes-medical', 'Medical Records'],
         ['appointments.php', 'fa-calendar-check', 'Appointments'],
-        ['coming_soon.php?feature=prescriptions', 'fa-pills', 'Prescriptions', true],
+        ['admin_operations.php?view=prescriptions', 'fa-pills', 'Prescriptions'],
         ['medical_tests.php', 'fa-flask-vial', 'Laboratory Reports'],
-        ['coming_soon.php?feature=access-overview', 'fa-shield-halved', 'Access Permissions', true],
-        ['coming_soon.php?feature=audit-logs', 'fa-clipboard-list', 'Audit Logs', true],
-        ['coming_soon.php?feature=reports', 'fa-chart-column', 'Reports & Analytics', true],
-        ['coming_soon.php?feature=system-statistics', 'fa-chart-pie', 'System Statistics', true],
-        ['coming_soon.php?feature=settings', 'fa-sliders', 'System Settings', true],
+        ['admin_operations.php?view=access-overview', 'fa-shield-halved', 'Access Permissions'],
+        ['admin_operations.php?view=audit-logs', 'fa-clipboard-list', 'Audit Logs'],
+        ['admin_operations.php?view=reports', 'fa-chart-column', 'Reports & Analytics'],
+        ['admin_operations.php?view=system-statistics', 'fa-chart-pie', 'System Statistics'],
+        ['admin_operations.php?view=settings', 'fa-sliders', 'System Settings'],
     ]);
 }
 
 $sidebarLinks[] = ['notifications.php', 'fa-bell', 'Notifications'];
-$sidebarLinks[] = [in_array($sidebarRole, ['Patient', 'Doctor'], true) ? 'settings.php' : 'coming_soon.php?feature=settings', 'fa-gear', 'Settings', !in_array($sidebarRole, ['Patient', 'Doctor'], true)];
+$sidebarLinks[] = [in_array($sidebarRole, ['Patient', 'Doctor'], true) ? 'settings.php' : ($sidebarRole === 'System Admin' ? 'admin_operations.php?view=settings' : 'settings.php'), 'fa-gear', 'Settings'];
 $sidebarLinks[] = ['help_support.php', 'fa-circle-question', 'Help & Support'];
 ?>
 <button class="sidebar-toggle" type="button" aria-label="Open navigation" aria-controls="nhreSidebar" aria-expanded="false">
@@ -123,9 +123,15 @@ $sidebarLinks[] = ['help_support.php', 'fa-circle-question', 'Help & Support'];
 
       $sidebarPath = basename((string)parse_url($sidebarHref, PHP_URL_PATH) ?: $sidebarHref);
       $sidebarActive = $sidebarPage === $sidebarPath;
-      if ($sidebarActive && $sidebarPath === 'coming_soon.php') {
+      if ($sidebarActive && in_array($sidebarPath, ['coming_soon.php', 'admin_operations.php', 'admin_credentials.php'], true)) {
           parse_str((string)parse_url($sidebarHref, PHP_URL_QUERY), $sidebarParams);
-          $sidebarActive = ($_GET['feature'] ?? '') === ($sidebarParams['feature'] ?? '');
+          $sidebarActive = true;
+          foreach ($sidebarParams as $sidebarParam => $sidebarValue) {
+              if ((string)($_GET[$sidebarParam] ?? '') !== (string)$sidebarValue) {
+                  $sidebarActive = false;
+                  break;
+              }
+          }
       }
       ?>
       <a href="<?= e($sidebarHref) ?>" class="sidebar-link <?= $sidebarActive ? 'is-active' : '' ?>" title="<?= e($sidebarLabel) ?>">
