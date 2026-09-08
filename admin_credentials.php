@@ -11,8 +11,11 @@ $errors = session_pull('errors', []);
 $success = session_pull('success');
 
 try {
-    $stmt = db()->prepare('SELECT id, fullname, email, role, password_hash FROM users WHERE role IN (?, ?, ?, ?) ORDER BY role, fullname');
-    $stmt->execute(['Patient', 'Doctor', 'Pharmacist', 'Lab Technician']);
+    $hospitalStmt = db()->prepare('SELECT hospital_id FROM users WHERE id = ? LIMIT 1');
+    $hospitalStmt->execute([(int)$_SESSION['user_id']]);
+    $hospitalId = (int)$hospitalStmt->fetchColumn();
+    $stmt = db()->prepare('SELECT id, fullname, email, role FROM users WHERE role IN (?, ?, ?, ?) AND hospital_id = ? ORDER BY role, fullname');
+    $stmt->execute(['Patient', 'Doctor', 'Pharmacist', 'Lab Technician', $hospitalId]);
     $accounts = $stmt->fetchAll();
 } catch (PDOException $e) {
     $errors[] = 'Unable to load user accounts.';
@@ -29,7 +32,7 @@ try {
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260811-16">
+  <link rel="stylesheet" href="assets/css/styles.css?v=20260818-11">
 </head>
 <body class="dashboard-body">
   <?php require __DIR__ . '/includes/sidebar.php'; ?>
@@ -53,8 +56,8 @@ try {
       <div class="dashboard-hero glass-card">
         <div>
           <span class="auth-kicker">Admin-only access</span>
-          <h1>View user account credentials</h1>
-          <p>This section is restricted to hospital administrators and should be used only for approved support tasks.</p>
+          <h1>User account directory</h1>
+          <p>Create and manage patient, clinical, pharmacy, and laboratory accounts for your hospital.</p>
         </div>
       </div>
 
@@ -73,11 +76,28 @@ try {
       <?php endif; ?>
 
       <div class="row g-4 mt-3">
-        <div class="col-12">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-key"></i></div>
-            <h2>Account access list</h2>
-            <p class="text-muted">Seeded accounts show their default login password; accounts with a custom password are masked.</p>
+        <div class="col-lg-5">
+          <article class="dashboard-card h-100">
+            <div class="dashboard-card-icon"><i class="fa-solid fa-user-plus"></i></div>
+            <h2>Add hospital account</h2>
+            <p class="text-muted">New accounts are assigned to your hospital automatically.</p>
+            <form action="auth/admin_account_create_process.php" method="POST" class="auth-form row g-3">
+              <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+              <div class="col-12"><input class="form-control" name="fullname" placeholder="Full name" required maxlength="150"></div>
+              <div class="col-md-6"><input class="form-control" name="nid" placeholder="National ID" required inputmode="numeric" pattern="[0-9]{10,20}"></div>
+              <div class="col-md-6"><select class="form-select" name="role" required><option value="">Choose role</option><option>Patient</option><option>Doctor</option><option>Pharmacist</option><option>Lab Technician</option></select></div>
+              <div class="col-12"><input class="form-control" type="email" name="email" placeholder="Email address" required maxlength="190"></div>
+              <div class="col-md-6"><input class="form-control" name="phone" placeholder="Phone number" required maxlength="20"></div>
+              <div class="col-md-6"><input class="form-control" type="password" name="password" placeholder="Temporary password" required minlength="8"></div>
+              <div class="col-12"><button class="btn btn-solid-nhre w-100" type="submit"><i class="fa-solid fa-user-plus me-2"></i>Create account</button></div>
+            </form>
+          </article>
+        </div>
+        <div class="col-lg-7">
+          <article class="dashboard-card h-100">
+            <div class="dashboard-card-icon"><i class="fa-solid fa-users-gear"></i></div>
+            <h2>Managed hospital accounts</h2>
+            <p class="text-muted">Passwords are never displayed. Removing an account permanently deletes its related account data.</p>
             <div class="table-responsive mt-3">
               <table class="table table-hover align-middle">
                 <thead>
@@ -85,7 +105,7 @@ try {
                     <th>Role</th>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Password</th>
+                    <th class="text-end">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -95,29 +115,11 @@ try {
                         <td><?= e($account['role']) ?></td>
                         <td><?= e($account['fullname']) ?></td>
                         <td><?= e($account['email']) ?></td>
-                        <td>
-                          <?php
-                            $defaultPassword = match ($account['role']) {
-                              'Doctor' => 'Doctor123!',
-                              'Patient' => 'Patient123!',
-                              'Pharmacist' => 'Pharmacist123!',
-                              'Lab Technician' => 'Lab123!',
-                              default => 'Password123!'
-                            };
-                            $matchesDefault = !empty($account['password_hash'])
-                              && password_verify($defaultPassword, $account['password_hash']);
-                          ?>
-                          <?php if ($matchesDefault): ?>
-                            <?= e($defaultPassword) ?>
-                            <span class="badge bg-success-subtle text-success-emphasis">seed</span>
-                          <?php else: ?>
-                            <span class="text-muted">custom (not shown)</span>
-                          <?php endif; ?>
-                        </td>
+                        <td class="text-end"><form action="auth/admin_account_delete_process.php" method="POST" onsubmit="return confirm('Remove this account? This cannot be undone.');"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>"><input type="hidden" name="account_id" value="<?= (int)$account['id'] ?>"><button type="submit" class="btn btn-outline-danger btn-sm">Remove</button></form></td>
                       </tr>
                     <?php endforeach; ?>
                   <?php else: ?>
-                    <tr><td colspan="4" class="text-center text-muted">No supported accounts found.</td></tr>
+                    <tr><td colspan="4" class="text-center text-muted">No managed accounts found.</td></tr>
                   <?php endif; ?>
                 </tbody>
               </table>
@@ -129,6 +131,6 @@ try {
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="assets/js/app.js?v=20260811-8"></script>
+  <script src="assets/js/app.js?v=20260818-11"></script>
 </body>
 </html>

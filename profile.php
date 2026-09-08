@@ -42,6 +42,7 @@ $blood_group = $profile['blood_group'] ?? '';
 $marital_status = $profile['marital_status'] ?? '';
 $occupation = $profile['occupation'] ?? '';
 $profile_photo = $profile['profile_photo'] ?? '';
+$resolved_avatar = user_avatar_url((string)$profile_photo, $user_id, (string)$role);
 $cartoon_avatar_options = [
     'kind-caregiver' => 'Kind caregiver',
     'bright-clinician' => 'Bright clinician',
@@ -115,13 +116,7 @@ function render_profile_value(mixed $value): string
       <div class="dashboard-hero glass-card">
         <div class="d-flex align-items-center gap-3">
           <div class="profile-avatar-wrapper">
-            <?php if (!empty($profile_photo)): ?>
-              <img src="<?= e($profile_photo) ?>" alt="Profile photo" class="profile-avatar">
-            <?php else: ?>
-              <div class="profile-avatar placeholder-avatar">
-                <i class="fa-solid fa-user"></i>
-              </div>
-            <?php endif; ?>
+            <img src="<?= e($resolved_avatar) ?>" alt="Profile photo" class="profile-avatar">
           </div>
           <div>
             <span class="auth-kicker">User Profile</span>
@@ -167,13 +162,7 @@ function render_profile_value(mixed $value): string
               <div class="fw-semibold"><?= e($account_number) ?></div>
             </div>
             <div class="profile-summary-photo mt-4">
-              <?php if (!empty($profile_photo)): ?>
-                <img src="<?= e($profile_photo) ?>" alt="Profile photo">
-              <?php else: ?>
-                <div class="profile-summary-placeholder">
-                  <i class="fa-solid fa-user"></i>
-                </div>
-              <?php endif; ?>
+              <img src="<?= e($resolved_avatar) ?>" alt="Profile photo">
             </div>
             <div class="cartoon-avatar-picker mt-4 text-start">
               <h3 class="h6 mb-1">Choose a cartoon profile picture</h3>
@@ -207,11 +196,7 @@ function render_profile_value(mixed $value): string
               <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
               <div class="profile-photo-card">
                 <div class="profile-photo-preview">
-                  <?php if (!empty($profile_photo)): ?>
-                    <img src="<?= e($profile_photo) ?>" alt="Current profile photo">
-                  <?php else: ?>
-                    <i class="fa-solid fa-camera"></i>
-                  <?php endif; ?>
+                  <img src="<?= e($resolved_avatar) ?>" alt="Current profile photo">
                 </div>
                 <div>
                   <label for="profile_photo" class="btn btn-auth-primary ripple">

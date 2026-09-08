@@ -58,7 +58,7 @@ try {
     $stmt = db()->prepare('DELETE FROM login_attempts WHERE email = ?');
     $stmt->execute([$email]);
 
-    redirect('../dashboard.php');
+    redirect($user['role'] === 'Hospital Admin' || $user['role'] === 'System Admin' ? '../admin_dashboard.php' : '../dashboard.php');
 } catch (PDOException $e) {
     $_SESSION['errors'] = ['Something went wrong. Please try again later.'];
     redirect('../login.php');

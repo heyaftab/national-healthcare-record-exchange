@@ -73,8 +73,15 @@ try {
     }
 
     if ($role === 'Hospital Admin') {
-        $stmt = db()->prepare('SELECT patient_id, doctor_id FROM appointments WHERE appointment_id = ? LIMIT 1');
-        $stmt->execute([$appointment_id]);
+        $stmt = db()->prepare(
+            'SELECT a.patient_id, a.doctor_id
+             FROM appointments a
+             JOIN users doctor ON doctor.id = a.doctor_id
+             JOIN users admin ON admin.id = ?
+             WHERE a.appointment_id = ? AND doctor.hospital_id = admin.hospital_id AND admin.hospital_id IS NOT NULL
+             LIMIT 1'
+        );
+        $stmt->execute([$user_id, $appointment_id]);
         $appointment = $stmt->fetch();
         if (!$appointment) {
             $_SESSION['errors'] = ['Appointment not found.'];

@@ -27,6 +27,20 @@ function e(mixed $value): string
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+/** Return an uploaded/saved avatar, or a stable generated portrait for the account. */
+function user_avatar_url(?string $profilePhoto, int $userId, string $role = ''): string
+{
+    $photo = trim((string)$profilePhoto);
+    if ($photo !== '') {
+        return $photo;
+    }
+
+    // Keep the established patient-facing doctor portrait for the doctor's own account too.
+    $seed = $role === 'Doctor' ? 'nhre-doctor-' . $userId : 'nhre-user-' . $userId;
+    return 'https://api.dicebear.com/9.x/avataaars/svg?seed=' . rawurlencode($seed)
+        . '&backgroundColor=b6e3f4,c0aede,d1d4f9&radius=50';
+}
+
 /** Whole years elapsed since a Y-m-d date of birth. */
 function age_from_dob(string $dateOfBirth): int
 {
@@ -458,6 +472,10 @@ function ensure_doctor_catalog_tables(): void
             }
         }
 
+        // Keep the bundled Hospital Admin usable while preserving hospital-level scope.
+        db()->exec("UPDATE users SET hospital_id = (SELECT id FROM hospitals ORDER BY id LIMIT 1)
+                    WHERE email = 'admin@nhre.gov' AND role = 'Hospital Admin' AND hospital_id IS NULL");
+
         $doctorCount = (int)db()->query("SELECT COUNT(*) FROM users WHERE role = 'Doctor'")->fetchColumn();
         if ($doctorCount < 100) {
             $districtRows = db()->query('SELECT id, name FROM districts ORDER BY id')->fetchAll();
@@ -501,7 +519,7 @@ function ensure_doctor_catalog_tables(): void
                     '100000000' . str_pad((string)$index, 2, '0', STR_PAD_LEFT),
                     'doctor' . str_pad((string)$index, 3, '0', STR_PAD_LEFT) . '@nhre.dev',
                     '+88017' . str_pad((string)(10000000 + $index), 8, '0', STR_PAD_LEFT),
-                    password_hash('Doctor123!', PASSWORD_DEFAULT),
+                    password_hash('Doctor' . str_pad((string)$index, 3, '0', STR_PAD_LEFT) . '!', PASSWORD_DEFAULT),
                     'Doctor',
                     $gender,
                     $district['name'] . ' Medical Center',
@@ -583,7 +601,49 @@ function ensure_doctor_catalog_tables(): void
             }
         }
 
+        ensure_seeded_doctor_credentials();
         ensure_demo_patients_and_records();
+    } catch (PDOException $e) {
+    }
+}
+
+/**
+ * Give every generated doctor account an individual demo password.  Existing
+ * accounts are migrated only when they still use the former shared password.
+ */
+function ensure_seeded_doctor_credentials(): void
+{
+    try {
+        $pdo = db();
+        $pdo->exec('CREATE TABLE IF NOT EXISTS `application_settings` (
+            `setting_key` VARCHAR(100) NOT NULL,
+            `setting_value` VARCHAR(255) NULL DEFAULT NULL,
+            PRIMARY KEY (`setting_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        $completed = $pdo->prepare('SELECT 1 FROM application_settings WHERE setting_key = ? LIMIT 1');
+        $completed->execute(['seeded_doctor_credentials_v1']);
+        if ($completed->fetchColumn()) {
+            return;
+        }
+
+        $doctors = $pdo->query("SELECT id, email, password_hash FROM users WHERE role = 'Doctor' AND email LIKE 'doctor%@nhre.dev'")->fetchAll();
+        $update = $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+
+        foreach ($doctors as $doctor) {
+            if (!preg_match('/^doctor(\\d{3})@nhre\\.dev$/', (string)$doctor['email'], $matches)
+                || !password_verify('Doctor123!', (string)$doctor['password_hash'])) {
+                continue;
+            }
+
+            $password = 'Doctor' . $matches[1] . '!';
+            $update->execute([password_hash($password, PASSWORD_DEFAULT), (int)$doctor['id']]);
+        }
+
+        $pdo->prepare('INSERT INTO application_settings (setting_key, setting_value) VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)')->execute([
+                'seeded_doctor_credentials_v1',
+                date('c'),
+            ]);
     } catch (PDOException $e) {
     }
 }

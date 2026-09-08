@@ -11,7 +11,7 @@ $success = session_pull('success');
 $error = session_pull('error');
 $demo_accounts = [
     ['role' => 'Patient', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'badge' => 'primary', 'seed' => 'demo-patient'],
-    ['role' => 'Doctor', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor123!', 'badge' => 'info', 'seed' => 'demo-doctor', 'email_note' => '(001–050)'],
+    ['role' => 'Doctor', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor001!', 'badge' => 'info', 'seed' => 'demo-doctor-001', 'email_note' => '(001–100)'],
     ['role' => 'Pharmacist', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
     ['role' => 'Lab Technician', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
     ['role' => 'Hospital Admin', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
@@ -181,12 +181,12 @@ function demo_profile_picture(array $account, array $photos): string
                     <th class="text-end">Action</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody id="moreDoctorAccounts">
                   <?php foreach ($demo_accounts as $account): ?>
                     <tr>
                       <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> demo account"></td>
                       <td><span class="badge bg-<?= e($account['badge']) ?>-subtle text-<?= e($account['badge']) ?>-emphasis"><?= e($account['role']) ?></span></td>
-                      <td class="font-monospace"><?= e($account['email']) ?><?php if (!empty($account['email_note'])): ?> <span class="text-muted"><?= e($account['email_note']) ?></span><?php endif; ?></td>
+                      <td class="font-monospace"><?= e($account['email']) ?><?php if (!empty($account['email_note'])): ?> <span class="text-muted"><?= e($account['email_note']) ?></span><?php endif; ?><?php if ($account['role'] === 'Doctor'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleDoctorAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php endif; ?></td>
                       <td class="font-monospace"><?= e($account['password']) ?></td>
                       <td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm" data-email="<?= e($account['email']) ?>" data-password="<?= e($account['password']) ?>">Use</button></td>
                     </tr>
@@ -218,6 +218,48 @@ function demo_profile_picture(array $account, array $photos): string
         email.focus();
         window.nhreToast && nhreToast('Demo credentials filled — you\u2019re ready to log in.');
       });
+    });
+    var doctorAccountsLoaded = false;
+    document.getElementById('toggleDoctorAccounts')?.addEventListener('click', async function () {
+      var expanded = this.getAttribute('aria-expanded') === 'true';
+      if (!doctorAccountsLoaded) {
+        this.disabled = true;
+        this.textContent = 'Loading…';
+        try {
+          var response = await fetch('doctor_demo_accounts.php', { headers: { Accept: 'application/json' } });
+          if (!response.ok) throw new Error('Unable to load doctor accounts.');
+          var accounts = await response.json();
+          var body = document.getElementById('moreDoctorAccounts');
+          accounts.forEach(function (account) {
+            var row = document.createElement('tr');
+            row.className = 'more-doctor-account';
+            row.innerHTML = '<td></td><td><span class="badge bg-info-subtle text-info-emphasis"></span></td><td class="font-monospace"></td><td class="font-monospace"></td><td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm">Use</button></td>';
+            row.cells[1].firstChild.textContent = account.fullname;
+            row.cells[2].textContent = account.email;
+            row.cells[3].textContent = account.password;
+            var useButton = row.querySelector('.btn-demo-fill');
+            useButton.addEventListener('click', function () {
+              document.getElementById('email').value = account.email;
+              document.getElementById('password').value = account.password;
+              document.getElementById('loginForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+              document.getElementById('email').focus();
+            });
+            body.appendChild(row);
+          });
+          doctorAccountsLoaded = true;
+        } catch (error) {
+          this.textContent = 'More';
+          window.nhreToast && nhreToast('Doctor accounts could not be loaded.');
+          return;
+        } finally {
+          this.disabled = false;
+        }
+      }
+      document.querySelectorAll('.more-doctor-account').forEach(function (row) {
+        row.classList.toggle('d-none', expanded);
+      });
+      this.setAttribute('aria-expanded', String(!expanded));
+      this.textContent = expanded ? 'More' : 'Hide';
     });
   </script>
 </body>

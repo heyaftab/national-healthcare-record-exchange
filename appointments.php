@@ -26,13 +26,16 @@ $doctor_specialization = trim((string)($_GET['doctor_specialization'] ?? ''));
 $selected_doctor_id = (int)($_GET['doctor_id'] ?? 0);
 $show_specialization_view = isset($_GET['view_specialization']) && $_GET['view_specialization'] === '1';
 $current_user_district = '';
+$adminHospitalId = 0;
 
 /** Return a stable, distinct cartoon portrait for each doctor in the catalog. */
 function doctor_cartoon_avatar(array $doctor): string
 {
-    $seed = 'nhre-doctor-' . (string)($doctor['id'] ?? 'default');
-    return 'https://api.dicebear.com/9.x/avataaars/svg?seed=' . rawurlencode($seed)
-        . '&backgroundColor=b6e3f4,c0aede,d1d4f9&radius=50';
+    return user_avatar_url(
+        isset($doctor['profile_photo']) ? (string)$doctor['profile_photo'] : null,
+        (int)($doctor['id'] ?? 0),
+        'Doctor'
+    );
 }
 
 try {
@@ -48,7 +51,7 @@ try {
 
     if ($role === 'Patient') {
         $stmt = db()->prepare(
-            'SELECT u.id, u.fullname, u.district, u.hospital_name, u.specialization, u.qualification, u.experience_years, u.consultation_fee, u.rating, u.reviews_count, u.address, u.bio, u.visiting_hours, u.awards, u.is_featured,
+            'SELECT u.id, u.fullname, u.profile_photo, u.district, u.hospital_name, u.specialization, u.qualification, u.experience_years, u.consultation_fee, u.rating, u.reviews_count, u.address, u.bio, u.visiting_hours, u.awards, u.is_featured,
                     d.name AS district_name, h.name AS hospital_name_db, s.name AS specialization_name
              FROM users u
              LEFT JOIN districts d ON d.id = u.district_id
@@ -184,16 +187,23 @@ try {
         $stmt->execute([(int)($_SESSION['user_id'] ?? 0)]);
         $appointments = $stmt->fetchAll();
     } elseif ($role === 'Hospital Admin') {
-        $stmt = db()->prepare('SELECT id, fullname FROM users WHERE role = ? ORDER BY fullname ASC');
-        $stmt->execute(['Doctor']);
+        $scopeStmt = db()->prepare('SELECT hospital_id FROM users WHERE id = ? LIMIT 1');
+        $scopeStmt->execute([(int)$_SESSION['user_id']]);
+        $adminHospitalId = (int)$scopeStmt->fetchColumn();
+        if ($adminHospitalId <= 0) {
+            throw new RuntimeException('Your administrator account is not assigned to a hospital.');
+        }
+        $stmt = db()->prepare('SELECT id, fullname FROM users WHERE role = ? AND hospital_id = ? ORDER BY fullname ASC');
+        $stmt->execute(['Doctor', $adminHospitalId]);
         $doctor_list = $stmt->fetchAll();
 
         $sql = 'SELECT a.appointment_id, a.appointment_date, a.appointment_time, a.reason, a.status, a.doctor_notes, pd.fullname AS patient_name, dd.fullname AS doctor_name
                 FROM appointments a
                 JOIN users pd ON pd.id = a.patient_id
-                JOIN users dd ON dd.id = a.doctor_id';
+                JOIN users dd ON dd.id = a.doctor_id
+                WHERE dd.hospital_id = ?';
         $conditions = [];
-        $params = [];
+        $params = [$adminHospitalId];
 
         if ($filter_patient !== '') {
             $conditions[] = 'pd.fullname LIKE ?';
@@ -212,7 +222,7 @@ try {
             $params[] = $filter_date;
         }
         if ($conditions) {
-            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+            $sql .= ' AND ' . implode(' AND ', $conditions);
         }
         $sql .= ' ORDER BY a.appointment_date ASC, a.appointment_time ASC';
         $stmt = db()->prepare($sql);

@@ -7,15 +7,17 @@ $sidebarInitials = mb_strtoupper(mb_substr(trim($sidebarName), 0, 1));
 $sidebarUnread = unread_notification_count((int)($_SESSION['user_id'] ?? 0));
 
 $sidebarPhoto = '';
+$sidebarAvatar = '';
 try {
     $sidebarPhotoStmt = db()->prepare('SELECT profile_photo FROM users WHERE id = ? LIMIT 1');
     $sidebarPhotoStmt->execute([(int)($_SESSION['user_id'] ?? 0)]);
     $sidebarPhoto = (string)$sidebarPhotoStmt->fetchColumn();
 } catch (PDOException $e) {
 }
+$sidebarAvatar = user_avatar_url($sidebarPhoto, (int)($_SESSION['user_id'] ?? 0), $sidebarRole);
 
 $sidebarLinks = [
-    ['dashboard.php', 'fa-house', 'Dashboard'],
+    [in_array($sidebarRole, ['Hospital Admin', 'System Admin'], true) ? 'admin_dashboard.php' : 'dashboard.php', 'fa-house', 'Dashboard'],
     ['profile.php', 'fa-user', 'My Profile'],
 ];
 
@@ -62,10 +64,10 @@ if ($sidebarRole === 'Patient') {
     ]);
 } elseif ($sidebarRole === 'Hospital Admin') {
     $sidebarLinks = array_merge($sidebarLinks, [
-        ['coming_soon.php?feature=hospital-profile', 'fa-hospital', 'Hospital Profile', true],
-        ['coming_soon.php?feature=doctors', 'fa-user-doctor', 'Doctors', true],
-        ['coming_soon.php?feature=patients', 'fa-user-group', 'Patients', true],
-        ['coming_soon.php?feature=hospital-staff', 'fa-users', 'Hospital Staff', true],
+        ['hospital_profile.php', 'fa-hospital', 'Hospital Profile'],
+        ['admin_credentials.php', 'fa-user-doctor', 'Doctors'],
+        ['admin_credentials.php', 'fa-user-group', 'Patients'],
+        ['admin_credentials.php', 'fa-users', 'Hospital Staff'],
         ['coming_soon.php?feature=departments', 'fa-table-cells-large', 'Departments', true],
         ['appointments.php', 'fa-calendar-check', 'Appointments'],
         ['coming_soon.php?feature=medical-records', 'fa-notes-medical', 'Medical Records', true],
@@ -108,11 +110,7 @@ $sidebarLinks[] = ['help_support.php', 'fa-circle-question', 'Help & Support'];
   <p class="sidebar-tagline">National Healthcare<br>Record Exchange</p>
   <a class="sidebar-user" href="profile.php" title="View profile">
     <span class="sidebar-avatar" aria-hidden="true">
-      <?php if ($sidebarPhoto !== ''): ?>
-        <img src="<?= e($sidebarPhoto) ?>" alt="">
-      <?php else: ?>
-        <?= e($sidebarInitials) ?>
-      <?php endif; ?>
+      <img src="<?= e($sidebarAvatar) ?>" alt="">
     </span>
     <span class="sidebar-user-text"><strong><?= e($sidebarName) ?></strong><small><?= e($sidebarRole) ?></small></span>
   </a>
