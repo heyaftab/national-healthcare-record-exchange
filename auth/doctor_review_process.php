@@ -24,6 +24,16 @@ if ($rating < 1 || $rating > 5) {
     redirect('../appointments.php?doctor_id=' . $doctorId . '#doctor-profile');
 }
 
+if (!function_exists('patient_has_completed_appointment_with_doctor')) {
+    $_SESSION['errors'] = ['Doctor review service is temporarily unavailable.'];
+    redirect('../appointments.php?doctor_id=' . $doctorId . '#doctor-profile');
+}
+
+if (!patient_has_completed_appointment_with_doctor($patientId, $doctorId)) {
+    $_SESSION['errors'] = ['You can only review a doctor after a completed appointment with them.'];
+    redirect('../appointments.php?doctor_id=' . $doctorId . '#doctor-profile');
+}
+
 if (mb_strlen($review) > 1000) {
     $_SESSION['errors'] = ['Review is too long. Please keep it under 1000 characters.'];
     redirect('../appointments.php?doctor_id=' . $doctorId . '#doctor-profile');

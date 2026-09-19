@@ -291,6 +291,449 @@ function ensure_clinical_tables(): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     try { $pdo->exec("ALTER TABLE notifications ADD COLUMN related_url VARCHAR(255) NULL, ADD COLUMN event_key VARCHAR(120) NULL, ADD UNIQUE KEY uq_notifications_event (user_id, event_key)"); } catch (PDOException $e) {}
     try { $pdo->exec("ALTER TABLE appointments ADD COLUMN status_updated_at DATETIME NULL, ADD COLUMN rejection_reason TEXT NULL"); } catch (PDOException $e) {}
+    ensure_realistic_patient_clinical_data();
+}
+
+function generate_bangladesh_patient_name(int $patientNumber, string $gender): string
+{
+    $maleNames = ['Arif', 'Imran', 'Rahim', 'Sami', 'Rafi', 'Shuvo', 'Kabir', 'Mahmud', 'Maruf', 'Tahmid', 'Asif', 'Nabil', 'Akram', 'Anik', 'Sabbir', 'Rifat', 'Hasan', 'Ahsan', 'Atik', 'Rakib'];
+    $femaleNames = ['Nadia', 'Sadia', 'Mariam', 'Ayesha', 'Nusrat', 'Shila', 'Faria', 'Tania', 'Ruma', 'Amina', 'Lamia', 'Mahi', 'Nabila', 'Tasnim', 'Sanzida', 'Farzana', 'Mehnaz', 'Zarin', 'Shampa', 'Jannat'];
+    $maleSurnames = ['Rahman', 'Hossain', 'Ahmed', 'Karim', 'Islam', 'Ali', 'Chowdhury', 'Mahmud', 'Sarker', 'Hasan', 'Mia', 'Talukder', 'Ahamed', 'Siddique', 'Akter', 'Noor'];
+    $femaleSurnames = ['Rahman', 'Ahmed', 'Hossain', 'Karim', 'Islam', 'Ali', 'Chowdhury', 'Mahmud', 'Sultana', 'Akter', 'Begum', 'Khatun', 'Ahamed', 'Talukder', 'Mou', 'Noor'];
+
+    $namePool = $gender === 'Female' ? $femaleNames : $maleNames;
+    $surnamePool = $gender === 'Female' ? $femaleSurnames : $maleSurnames;
+
+    $first = $namePool[$patientNumber % count($namePool)];
+    $last = $surnamePool[(($patientNumber * 7) + 3) % count($surnamePool)];
+
+    return $first . ' ' . $last;
+}
+
+function get_bangladesh_patient_profile(int $patientNumber, string $profileKey = 'dhaka_tertiary'): array
+{
+    $profiles = [
+        'dhaka_tertiary' => [
+            'district_weights' => [
+                'Dhaka' => 62,
+                'Chattogram' => 12,
+                'Khulna' => 8,
+                'Rajshahi' => 7,
+                'Sylhet' => 6,
+                'Barishal' => 3,
+                'Rangpur' => 1,
+                'Mymensingh' => 1,
+            ],
+            'age_band_weights' => [
+                '0-17' => 4,
+                '18-29' => 18,
+                '30-44' => 33,
+                '45-59' => 28,
+                '60+' => 17,
+            ],
+            'gender_bias' => ['Female' => 53, 'Male' => 47],
+        ],
+        'district_referral_mix' => [
+            'district_weights' => [
+                'Dhaka' => 28,
+                'Chattogram' => 16,
+                'Khulna' => 12,
+                'Rajshahi' => 12,
+                'Sylhet' => 10,
+                'Barishal' => 8,
+                'Rangpur' => 8,
+                'Mymensingh' => 6,
+            ],
+            'age_band_weights' => [
+                '0-17' => 10,
+                '18-29' => 26,
+                '30-44' => 32,
+                '45-59' => 20,
+                '60+' => 12,
+            ],
+            'gender_bias' => ['Female' => 51, 'Male' => 49],
+        ],
+        'elderly_chronic_care' => [
+            'district_weights' => [
+                'Dhaka' => 34,
+                'Chattogram' => 14,
+                'Khulna' => 10,
+                'Rajshahi' => 10,
+                'Sylhet' => 9,
+                'Barishal' => 7,
+                'Rangpur' => 9,
+                'Mymensingh' => 7,
+            ],
+            'age_band_weights' => [
+                '0-17' => 5,
+                '18-29' => 10,
+                '30-44' => 17,
+                '45-59' => 28,
+                '60+' => 40,
+            ],
+            'gender_bias' => ['Female' => 54, 'Male' => 46],
+        ],
+    ];
+
+    $profile = $profiles[$profileKey] ?? $profiles['dhaka_tertiary'];
+
+    $districts = [];
+    foreach ($profile['district_weights'] as $district => $weight) {
+        for ($i = 0; $i < $weight; $i++) {
+            $districts[] = $district;
+        }
+    }
+
+    $district = $districts[$patientNumber % count($districts)];
+
+    $ageBands = [];
+    foreach ($profile['age_band_weights'] as $band => $weight) {
+        for ($i = 0; $i < $weight; $i++) {
+            $ageBands[] = $band;
+        }
+    }
+
+    $band = $ageBands[$patientNumber % count($ageBands)];
+    $ageRanges = [
+        '0-17' => [4, 17],
+        '18-29' => [18, 29],
+        '30-44' => [30, 44],
+        '45-59' => [45, 59],
+        '60+' => [60, 82],
+    ];
+    [$minAge, $maxAge] = $ageRanges[$band];
+    $age = $minAge + (($patientNumber * 11 + 4) % ($maxAge - $minAge + 1));
+
+    $gender = ($patientNumber % 100 < $profile['gender_bias']['Female']) ? 'Female' : 'Male';
+    if ($band === '0-17') {
+        $gender = (($patientNumber * 7) % 10 < 5) ? 'Female' : 'Male';
+    }
+
+    return ['district' => $district, 'age_band' => $band, 'age' => $age, 'gender' => $gender];
+}
+
+function generate_bangladesh_patient_birth_date(int $patientNumber, string $profileKey = 'dhaka_tertiary'): string
+{
+    $profile = get_bangladesh_patient_profile($patientNumber, $profileKey);
+    $year = date('Y') - $profile['age'];
+    $month = 1 + (($patientNumber * 5) % 12);
+    $day = 1 + (($patientNumber * 9) % 28);
+
+    return sprintf('%04d-%02d-%02d', $year, $month, $day);
+}
+
+function ensure_named_patient_test_accounts(): void
+{
+    try {
+        $pdo = db();
+        $accounts = [
+            ['Patient A', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Female', 'House 12, Road 3, Dhanmondi', '1994-03-12', '9000005101', 'Teacher'],
+            ['Patient 002', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Male', 'House 21, Road 7, Gulshan', '1988-09-21', '9000005102', 'Software Engineer'],
+            ['Patient 003', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Female', 'House 7, Road 5, Uttara', '2001-11-04', '9000005103', 'Student'],
+        ];
+
+        $check = $pdo->prepare('SELECT id FROM users WHERE email = ? AND role = ? LIMIT 1');
+        $insert = $pdo->prepare(
+            'INSERT INTO users (fullname, nid, email, phone, password_hash, role, gender, address, date_of_birth, blood_group, occupation)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+
+        foreach ($accounts as $index => $account) {
+            [$fullname, $email, $phone, $password, $gender, $address, $dob, $nid, $occupation] = $account;
+            $check->execute([$email, 'Patient']);
+            if ($check->fetch()) {
+                continue;
+            }
+
+            $bloodGroup = ['A+', 'O+', 'B+', 'AB+', 'A-', 'O-', 'B-', 'AB-'][$index % 8];
+            $insert->execute([
+                $fullname,
+                $nid,
+                $email,
+                $phone,
+                password_hash($password, PASSWORD_DEFAULT),
+                'Patient',
+                $gender,
+                $address,
+                $dob,
+                $bloodGroup,
+                $occupation,
+            ]);
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+function ensure_realistic_patient_population(string $profileKey = 'dhaka_tertiary'): void
+{
+    try {
+        $pdo = db();
+        $targetPatientCount = 280;
+        $patientCount = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'Patient'")->fetchColumn();
+        if ($patientCount >= $targetPatientCount) {
+            ensure_named_patient_test_accounts();
+            return;
+        }
+
+        $existing = $pdo->query("SELECT email FROM users WHERE role = 'Patient'")->fetchAll(PDO::FETCH_COLUMN);
+        $existingSet = array_fill_keys($existing, true);
+        $insert = $pdo->prepare(
+            'INSERT INTO users (fullname, nid, email, phone, password_hash, role, gender, address, date_of_birth, blood_group, occupation)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+
+        for ($patientNumber = $patientCount + 1; $patientNumber <= $targetPatientCount; $patientNumber++) {
+            $profile = get_bangladesh_patient_profile($patientNumber, $profileKey);
+            $gender = $profile['gender'];
+            $fullname = generate_bangladesh_patient_name($patientNumber, $gender);
+            $email = 'patient' . str_pad((string)$patientNumber, 3, '0', STR_PAD_LEFT) . '@nhre.local';
+            $nid = (string)(9000000000 + $patientNumber);
+            $phone = '+88017' . str_pad((string)(10000000 + $patientNumber), 8, '0', STR_PAD_LEFT);
+
+            $candidateIndex = 0;
+            while (true) {
+                $candidateEmail = $candidateIndex === 0 ? $email : 'patient' . str_pad((string)$patientNumber, 3, '0', STR_PAD_LEFT) . '.' . $candidateIndex . '@nhre.local';
+                $candidateNid = (string)(9000000000 + $patientNumber + $candidateIndex);
+                $candidatePhone = '+88017' . str_pad((string)(10000000 + $patientNumber + $candidateIndex), 8, '0', STR_PAD_LEFT);
+                $duplicate = $pdo->prepare('SELECT id FROM users WHERE email = ? OR nid = ? OR phone = ? LIMIT 1');
+                $duplicate->execute([$candidateEmail, $candidateNid, $candidatePhone]);
+
+                if (!$duplicate->fetch()) {
+                    $email = $candidateEmail;
+                    $nid = $candidateNid;
+                    $phone = $candidatePhone;
+                    break;
+                }
+
+                $candidateIndex++;
+                if ($candidateIndex > 2000) {
+                    break;
+                }
+            }
+
+            if (isset($existingSet[$email])) {
+                continue;
+            }
+
+            $dob = generate_bangladesh_patient_birth_date($patientNumber, $profileKey);
+            $district = $profile['district'];
+            $address = sprintf('House %d, Road %d, %s', 4 + ($patientNumber % 22), 2 + ($patientNumber % 11), $district);
+
+            $insert->execute([
+                $fullname,
+                $nid,
+                $email,
+                $phone,
+                password_hash('Patient123!', PASSWORD_DEFAULT),
+                'Patient',
+                $gender,
+                $address,
+                $dob,
+                ['A+','O+','B+','AB+','A-','O-','B-','AB-'][$patientNumber % 8],
+                ['Teacher', 'Engineer', 'Housewife', 'Business', 'Freelancer', 'Student', 'Farmer', 'Nurse'][$patientNumber % 8]
+            ]);
+
+            $existingSet[$email] = true;
+        }
+
+        ensure_named_patient_test_accounts();
+    } catch (PDOException $e) {
+    }
+}
+
+function ensure_realistic_patient_clinical_data(): void
+{
+    try {
+        $pdo = db();
+        ensure_realistic_patient_population();
+        $patients = $pdo->query("SELECT id, fullname, email FROM users WHERE role = 'Patient' ORDER BY id ASC")->fetchAll();
+        if (!$patients) {
+            return;
+        }
+
+        $doctorIds = $pdo->query("SELECT id FROM users WHERE role = 'Doctor' ORDER BY id ASC")->fetchAll();
+        $doctorIdList = array_map(static fn (array $row): int => (int)$row['id'], $doctorIds);
+
+        $allergyCatalog = [
+            ['Environmental', 'Dust', 'Sneezing and itchy eyes', 'Mild', 'Common household dust exposure.'],
+            ['Environmental', 'Pollen', 'Seasonal congestion and watery eyes', 'Moderate', 'Most common seasonal inhalant allergen.'],
+            ['Food', 'Peanuts', 'Lip swelling and hives', 'Severe', 'Often triggered by snacks or bakery foods.'],
+            ['Food', 'Shellfish', 'Gut discomfort and rash', 'Moderate', 'Food-triggered allergic reaction.'],
+            ['Drug', 'Penicillin', 'Rash and itching', 'Moderate', 'Medication allergy recorded during treatment.'],
+            ['Drug', 'Ibuprofen', 'Stomach upset and wheezing', 'Mild', 'Non-steroidal anti-inflammatory sensitivity.'],
+            ['Food', 'Milk protein', 'Abdominal cramps and rash', 'Mild', 'Common in children and some adults.'],
+            ['Environmental', 'Latex', 'Skin irritation and swelling', 'Moderate', 'Common in healthcare or glove exposure.'],
+            ['Insect', 'Bee sting', 'Localized swelling', 'Moderate', 'Requires prompt medical attention if severe.'],
+            ['Food', 'Eggs', 'Skin rash and vomiting', 'Mild', 'Occurs in some patients with food sensitivity.'],
+        ];
+
+        $checkAllergy = $pdo->prepare('SELECT id FROM allergies WHERE patient_id = ? AND name = ? AND allergy_type = ? LIMIT 1');
+        $insertAllergy = $pdo->prepare('INSERT INTO allergies (patient_id, allergy_type, name, reaction_text, severity, notes, recorded_at, is_active) VALUES (?, ?, ?, ?, ?, ?, CURDATE(), 1)');
+
+        foreach ($patients as $index => $patient) {
+            $patientId = (int)$patient['id'];
+            $dob = (string)($patient['date_of_birth'] ?? '');
+            $age = $dob !== '' ? age_from_dob($dob) : 35;
+            $gender = (string)($patient['gender'] ?? 'Female');
+
+            $baseAllergyProbability = 0.18;
+            if ($age >= 60) {
+                $baseAllergyProbability = 0.72;
+            } elseif ($age >= 45) {
+                $baseAllergyProbability = 0.58;
+            } elseif ($age >= 30) {
+                $baseAllergyProbability = 0.46;
+            } elseif ($age >= 18) {
+                $baseAllergyProbability = 0.34;
+            } else {
+                $baseAllergyProbability = 0.24;
+            }
+
+            if ($gender === 'Female') {
+                $baseAllergyProbability += 0.04;
+            }
+
+            $allergyProbability = min(0.78, max(0.18, $baseAllergyProbability));
+            $allergyRoll = (($patientId * 19 + $index * 11 + 7) % 100) + 1;
+            $allergyCount = $allergyRoll <= (int)round($allergyProbability * 100) ? 1 + (($patientId * 13 + $index * 3) % 2) : 0;
+            $selected = [];
+            $used = [];
+            for ($i = 0; $i < $allergyCount; $i++) {
+                $pick = (($patientId * 13) + ($i * 29) + 5) % count($allergyCatalog);
+                $pick = isset($used[$pick]) ? (($pick + 1) % count($allergyCatalog)) : $pick;
+                $used[$pick] = true;
+                $selected[] = $allergyCatalog[$pick];
+            }
+
+            foreach ($selected as $item) {
+                [$type, $name, $reaction, $severity, $notes] = $item;
+                $checkAllergy->execute([$patientId, $name, $type]);
+                if ($checkAllergy->fetch()) {
+                    continue;
+                }
+                $insertAllergy->execute([$patientId, $type, $name, $reaction, $severity, $notes]);
+            }
+        }
+
+        $documentCatalog = [
+            ['Prescription', 'prescription', 'Prescription', 'Primary care medication list'],
+            ['Lab report', 'lab-report', 'CBC Report', 'Routine blood work summary'],
+            ['Lab report', 'lab-report', 'Lipid Panel', 'Cholesterol and triglyceride profile'],
+            ['Imaging report', 'imaging', 'Chest X-ray', 'Radiology review and interpretation'],
+            ['Medical certificate', 'certificate', 'Medical Certificate', 'Sick leave and clinic note'],
+            ['Vaccination document', 'vaccination', 'Vaccination Record', 'Immunization history summary'],
+            ['Other', 'other', 'Follow-up Summary', 'Clinical summary and care plan'],
+        ];
+
+        $ensureDir = __DIR__ . '/../uploads/private_documents';
+        if (!is_dir($ensureDir) && !mkdir($ensureDir, 0775, true) && !is_dir($ensureDir)) {
+            return;
+        }
+
+        $checkDocument = $pdo->prepare('SELECT id FROM medical_documents WHERE patient_id = ? AND original_name = ? LIMIT 1');
+        $insertDocument = $pdo->prepare('INSERT INTO medical_documents (patient_id, uploaded_by, category, original_name, stored_name, mime_type, file_size, notes, verification_status, verified_by, verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())');
+
+        foreach ($patients as $index => $patient) {
+            $patientId = (int)$patient['id'];
+            $dob = (string)($patient['date_of_birth'] ?? '');
+            $age = $dob !== '' ? age_from_dob($dob) : 35;
+
+            $docDistributionRoll = (($patientId * 23 + $index * 11 + 5) % 100) + 1;
+            $docCount = 1;
+            if ($age >= 60) {
+                $docCount = $docDistributionRoll <= 10 ? 3 : ($docDistributionRoll <= 55 ? 4 : 5);
+            } elseif ($age >= 45) {
+                $docCount = $docDistributionRoll <= 15 ? 2 : ($docDistributionRoll <= 60 ? 3 : 4);
+            } elseif ($age >= 30) {
+                $docCount = $docDistributionRoll <= 18 ? 2 : ($docDistributionRoll <= 62 ? 3 : 4);
+            } elseif ($age >= 18) {
+                $docCount = $docDistributionRoll <= 22 ? 1 : ($docDistributionRoll <= 66 ? 2 : 3);
+            } else {
+                $docCount = $docDistributionRoll <= 35 ? 1 : 2;
+            }
+
+            $docCount = min(5, max(1, $docCount));
+
+            for ($i = 0; $i < $docCount; $i++) {
+                $catalogItem = $documentCatalog[(($patientId * 11) + ($i * 17) + 12) % count($documentCatalog)];
+                [$category, $prefix, $name, $note] = $catalogItem;
+                $suffix = date('Y-m', strtotime('-' . (($patientId + $i) % 18) . ' months'));
+                $originalName = $prefix . '-' . $patientId . '-' . ($i + 1) . '-' . $suffix . '.pdf';
+                $checkDocument->execute([$patientId, $originalName]);
+                if ($checkDocument->fetch()) {
+                    continue;
+                }
+
+                $storedName = bin2hex(random_bytes(16)) . '.pdf';
+                $pdfContent = build_placeholder_pdf($patient['fullname'], $category, $name, $note, $suffix);
+                $filePath = $ensureDir . '/' . $storedName;
+                file_put_contents($filePath, $pdfContent);
+
+                $verification = (($patientId * 7 + $i * 13) % 100) < 84 ? 'Verified' : 'Pending Verification';
+                $verifiedBy = $verification === 'Verified' && $doctorIdList !== [] ? $doctorIdList[(($patientId + $i) % count($doctorIdList))] : null;
+
+                $insertDocument->execute([
+                    $patientId,
+                    $patientId,
+                    $category,
+                    $originalName,
+                    $storedName,
+                    'application/pdf',
+                    (int)strlen($pdfContent),
+                    'Uploaded during routine care follow-up.',
+                    $verification,
+                    $verifiedBy,
+                ]);
+            }
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+function build_placeholder_pdf(string $patientName, string $category, string $documentName, string $note, string $period): string
+{
+    $text = sprintf("NHRE Medical Record\nPatient: %s\nDocument: %s\nCategory: %s\nPeriod: %s\nNote: %s\n",
+        $patientName,
+        $documentName,
+        $category,
+        $period,
+        $note
+    );
+    $lines = explode("\n", $text);
+    $content = "BT\n/F1 12 Tf\n20 760 Td\n";
+    foreach ($lines as $line) {
+        $content .= "/F1 12 Tf\n20 760 Td\n(" . str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $line) . ") Tj\n";
+        $content .= "0 -18 Td\n";
+    }
+    $content .= "ET\n";
+
+    $objects = [];
+    $objects[] = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+    $objects[] = "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
+    $objects[] = "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n";
+    $objects[] = "4 0 obj\n<< /Length " . strlen($content) . " >>\nstream\n" . $content . "endstream\nendobj\n";
+    $objects[] = "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n";
+
+    $pdf = "%PDF-1.4\n";
+    $offsets = [0];
+    foreach ($objects as $object) {
+        $offsets[] = strlen($pdf);
+        $pdf .= $object;
+    }
+
+    $xrefStart = strlen($pdf);
+    $pdf .= "xref\n0 " . (count($objects) + 1) . "\n";
+    $pdf .= "0000000000 65535 f \n";
+    for ($i = 1; $i <= count($objects); $i++) {
+        $pdf .= sprintf("%010d 00000 n \n", $offsets[$i]);
+    }
+    $pdf .= "trailer\n";
+    $pdf .= "<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n";
+    $pdf .= "startxref\n";
+    $pdf .= $xrefStart . "\n";
+    $pdf .= "%%EOF\n";
+
+    return $pdf;
 }
 
 function create_event_notification(PDO $pdo, int $userId, string $title, string $message, string $type, string $eventKey, string $url): void
@@ -331,6 +774,12 @@ function ensure_appointments_table_exists(): void
 
 function ensure_doctor_profile_columns(): void
 {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
     try {
         $stmt = db()->query('SHOW COLUMNS FROM users');
         $cols = [];
@@ -394,6 +843,12 @@ function ensure_doctor_profile_columns(): void
 
 function ensure_doctor_catalog_tables(): void
 {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
     db()->exec(
         'CREATE TABLE IF NOT EXISTS `districts` (
           `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -535,7 +990,7 @@ function ensure_doctor_catalog_tables(): void
                     '100000000' . str_pad((string)$index, 2, '0', STR_PAD_LEFT),
                     'doctor' . str_pad((string)$index, 3, '0', STR_PAD_LEFT) . '@nhre.dev',
                     '+88017' . str_pad((string)(10000000 + $index), 8, '0', STR_PAD_LEFT),
-                    password_hash('Doctor' . str_pad((string)$index, 3, '0', STR_PAD_LEFT) . '!', PASSWORD_DEFAULT),
+                    password_hash('Doctor123!', PASSWORD_DEFAULT),
                     'Doctor',
                     $gender,
                     $district['name'] . ' Medical Center',
@@ -557,32 +1012,9 @@ function ensure_doctor_catalog_tables(): void
                 ]);
             }
 
-            $patientCount = (int)db()->query("SELECT COUNT(*) FROM users WHERE email = 'patient@nhre.gov'")->fetchColumn();
-            if ($patientCount === 0) {
-                db()->prepare(
-                    'INSERT INTO users (fullname, nid, email, phone, password_hash, role, gender, address, district, hospital_name, specialization, qualification, experience_years, consultation_fee, rating, reviews_count)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-                )->execute([
-                    'Demo Patient',
-                    '2000000000',
-                    'patient@nhre.gov',
-                    '+8801712345678',
-                    password_hash('Patient123!', PASSWORD_DEFAULT),
-                    'Patient',
-                    'Female',
-                    'House 12, Road 4, Dhanmondi',
-                    'Dhaka',
-                    '',
-                    '',
-                    '',
-                    null,
-                    null,
-                    null,
-                    null
-                ]);
-            }
+            ensure_realistic_patient_population();
 
-            $patientRow = db()->query("SELECT id FROM users WHERE email = 'patient@nhre.gov' LIMIT 1")->fetch();
+            $patientRow = db()->query("SELECT id FROM users WHERE role = 'Patient' ORDER BY id ASC LIMIT 1")->fetch();
             $patientId = $patientRow ? (int)$patientRow['id'] : 0;
             if ($patientId > 0) {
                 $appointmentCount = (int)db()->query('SELECT COUNT(*) FROM appointments')->fetchColumn();
@@ -618,9 +1050,17 @@ function ensure_doctor_catalog_tables(): void
         }
 
         ensure_seeded_doctor_credentials();
-        ensure_demo_patients_and_records();
     } catch (PDOException $e) {
     }
+}
+
+/**
+ * Demo patient seeding is intentionally disabled to preserve real patient
+ * accounts and prevent synthetic records from being regenerated.
+ */
+function ensure_demo_patients_and_records(): void
+{
+    return;
 }
 
 /**
@@ -642,18 +1082,8 @@ function ensure_seeded_doctor_credentials(): void
             return;
         }
 
-        $doctors = $pdo->query("SELECT id, email, password_hash FROM users WHERE role = 'Doctor' AND email LIKE 'doctor%@nhre.dev'")->fetchAll();
-        $update = $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
-
-        foreach ($doctors as $doctor) {
-            if (!preg_match('/^doctor(\\d{3})@nhre\\.dev$/', (string)$doctor['email'], $matches)
-                || !password_verify('Doctor123!', (string)$doctor['password_hash'])) {
-                continue;
-            }
-
-            $password = 'Doctor' . $matches[1] . '!';
-            $update->execute([password_hash($password, PASSWORD_DEFAULT), (int)$doctor['id']]);
-        }
+        $pdo->prepare('UPDATE users SET password_hash = ? WHERE role = ? AND email LIKE ?')
+            ->execute([password_hash('Doctor123!', PASSWORD_DEFAULT), 'Doctor', 'doctor%@nhre.dev']);
 
         $pdo->prepare('INSERT INTO application_settings (setting_key, setting_value) VALUES (?, ?)
             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)')->execute([
@@ -664,31 +1094,6 @@ function ensure_seeded_doctor_credentials(): void
     }
 }
 
-/** Seed 25 clearly labelled, repeatable demo patients and varied basic clinical records. */
-function ensure_demo_patients_and_records(): void
-{
-    ensure_clinical_tables();
-    $names = ['Amina Sultana','Rafiq Hasan','Nusrat Jahan','Shafiq Ahmed','Farzana Akter','Imran Hossain','Maliha Noor','Tanvir Islam','Sadia Rahman','Kamal Uddin','Lamia Chowdhury','Arif Mahmud','Ruma Khan','Nabil Karim','Ishrat Banu','Samiul Haque','Tasnima Das','Mahir Paul','Bithi Begum','Rony Mia','Faria Yasmin','Atik Rahman','Moushumi Akter','Sajid Hasan','Prapti Sultana'];
-    $districts = ['Dhaka','Chattogram','Rajshahi','Khulna','Sylhet','Barishal','Rangpur','Mymensingh'];
-    $blood = ['A+','B+','O+','AB+','A-','B-','O-','AB-'];
-    $pdo = db();
-    $exists = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-    $insert = $pdo->prepare('INSERT INTO users (fullname,nid,email,phone,password_hash,role,account_number,date_of_birth,gender,address,district,blood_group,emergency_contact,occupation) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-    $allergy = $pdo->prepare('INSERT INTO allergies (patient_id,allergy_type,name,reaction_text,severity,notes,recorded_at) SELECT ?,?,?,?,?,?,CURDATE() WHERE NOT EXISTS (SELECT 1 FROM allergies WHERE patient_id = ? AND name = ?)');
-    foreach ($names as $offset => $name) {
-        $n = $offset + 1; $email = $n === 1 ? 'patient@nhre.gov' : 'patient' . str_pad((string)$n, 3, '0', STR_PAD_LEFT) . '@nhre.demo';
-        $exists->execute([$email]); $id = (int)$exists->fetchColumn();
-        if ($id === 0) {
-            $insert->execute([$n === 1 ? 'Demo Patient A — ' . $name : 'DEMO Patient ' . $name, '2000000' . str_pad((string)$n, 3, '0', STR_PAD_LEFT), $email, '+88018' . str_pad((string)(10000000 + $n), 8, '0', STR_PAD_LEFT), password_hash('Patient123!', PASSWORD_DEFAULT), 'Patient', 'NHRE-P-' . str_pad((string)$n, 6, '0', STR_PAD_LEFT), sprintf('%04d-%02d-%02d', 1980 + ($n % 22), 1 + ($n % 12), 1 + ($n % 27)), $n % 2 ? 'Female' : 'Male', 'DEMO address, ' . $districts[$offset % count($districts)], $districts[$offset % count($districts)], $blood[$offset % count($blood)], '+88019' . str_pad((string)(20000000 + $n), 8, '0', STR_PAD_LEFT), $n % 2 ? 'Teacher' : 'Engineer']);
-            $id = (int)$pdo->lastInsertId();
-        }
-        $allergens = [['Drug','Penicillin','Rash','Moderate'],['Food','Peanuts','Hives','Severe'],['Environmental','Dust','Sneezing','Mild'],['Drug','Ibuprofen','Stomach upset','Moderate']];
-        $item = $allergens[$offset % count($allergens)];
-        $allergy->execute([$id,$item[0],$item[1],$item[2],$item[3],'DEMO clinical record only.',$id,$item[1]]);
-    }
-    // Keep the original demo patient's seeded requests visible after the calendar advances.
-    $pdo->exec("UPDATE appointments a JOIN users p ON p.id = a.patient_id SET a.appointment_date = CURDATE() WHERE p.email = 'patient@nhre.gov' AND a.appointment_date < CURDATE()");
-}
 
 /**
  * Idempotently seed one demo account for every role that cannot self-register
@@ -696,34 +1101,150 @@ function ensure_demo_patients_and_records(): void
  * ready-made demo credentials). Passwords match the defaults shown on the login
  * page and in the README demo accounts table.
  */
+function default_patient_id_for_demo_seed(): ?int
+{
+    try {
+        $pdo = db();
+        $preferred = [
+            'patient@nhre.gov',
+            'patient002@nhre.demo',
+            'patient003@nhre.demo',
+        ];
+
+        foreach ($preferred as $email) {
+            $id = (int)$pdo->query("SELECT id FROM users WHERE role = 'Patient' AND email = '$email' LIMIT 1")->fetchColumn();
+            if ($id > 0) {
+                return $id;
+            }
+        }
+
+        $fallback = (int)$pdo->query("SELECT id FROM users WHERE role = 'Patient' ORDER BY id ASC LIMIT 1")->fetchColumn();
+        return $fallback > 0 ? $fallback : null;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+function ensure_unique_user_identity_data(): void
+{
+    try {
+        $pdo = db();
+        $rows = $pdo->query('SELECT id, email, phone, nid FROM users ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        $seenEmails = [];
+        $seenPhones = [];
+        $seenNids = [];
+
+        foreach ($rows as $row) {
+            $id = (int)($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+
+            $email = strtolower(trim((string)($row['email'] ?? '')));
+            if ($email !== '' && isset($seenEmails[$email])) {
+                $email = 'user' . $id . '@nhre.local';
+                $pdo->prepare('UPDATE users SET email = ? WHERE id = ?')->execute([$email, $id]);
+            }
+            $seenEmails[$email] = true;
+
+            $phone = trim((string)($row['phone'] ?? ''));
+            $candidatePhone = $phone;
+            $counter = 1;
+            while ($candidatePhone !== '' && isset($seenPhones[$candidatePhone])) {
+                $candidatePhone = '+88017' . str_pad((string)(30000000 + $id + $counter), 8, '0', STR_PAD_LEFT);
+                $counter++;
+            }
+            if ($candidatePhone !== $phone && $candidatePhone !== '') {
+                $pdo->prepare('UPDATE users SET phone = ? WHERE id = ?')->execute([$candidatePhone, $id]);
+            }
+            $seenPhones[$candidatePhone !== '' ? $candidatePhone : $phone] = true;
+
+            $nid = trim((string)($row['nid'] ?? ''));
+            if ($nid !== '' && isset($seenNids[$nid])) {
+                $replacement = (string)(9000000000 + $id + 1000000);
+                $pdo->prepare('UPDATE users SET nid = ? WHERE id = ?')->execute([$replacement, $id]);
+                $nid = $replacement;
+            }
+            if ($nid !== '') {
+                $seenNids[$nid] = true;
+            }
+        }
+    } catch (PDOException $e) {
+    }
+}
+
 function ensure_demo_accounts(): void
 {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        ensure_unique_user_identity_data();
+    } catch (PDOException $e) {
+    }
     $accounts = [
-        ['Demo Patient',          '0000000001', 'patient@nhre.gov', '+8801000000001', 'Patient123!', 'Patient'],
-        ['Hospital Administrator', '0000000002', 'admin@nhre.gov', '+8801000000002', 'Admin123!', 'Hospital Admin'],
-        ['System Administrator',   '0000000003', 'sysadmin@nhre.gov', '+8801000000003', 'SysAdmin123!', 'System Admin'],
-        ['Demo Pharmacist',        '0000000004', 'pharmacist@nhre.gov', '+8801000000004', 'Pharmacist123!', 'Pharmacist'],
-        ['Demo Lab Technician',    '0000000005', 'lab@nhre.gov', '+8801000000005', 'Lab123!', 'Lab Technician'],
+        ['Patient A', '1000000001', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Patient'],
+        ['Patient 002', '1000000002', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Patient'],
+        ['Patient 003', '1000000003', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Patient'],
+        ['Patient 004', '1000000004', 'patient004@nhre.demo', '+8801710001004', 'Patient123!', 'Patient'],
+        ['Patient 005', '1000000005', 'patient005@nhre.demo', '+8801710001005', 'Patient123!', 'Patient'],
+        ['Patient 006', '1000000006', 'patient006@nhre.demo', '+8801710001006', 'Patient123!', 'Patient'],
+        ['Patient 007', '1000000007', 'patient007@nhre.demo', '+8801710001007', 'Patient123!', 'Patient'],
+        ['Patient 008', '1000000008', 'patient008@nhre.demo', '+8801710001008', 'Patient123!', 'Patient'],
+        ['Patient 009', '1000000009', 'patient009@nhre.demo', '+8801710001009', 'Patient123!', 'Patient'],
+        ['Patient 010', '1000000010', 'patient010@nhre.demo', '+8801710001010', 'Patient123!', 'Patient'],
+        ['Patient 011', '1000000011', 'patient011@nhre.demo', '+8801710001011', 'Patient123!', 'Patient'],
+        ['Patient 012', '1000000012', 'patient012@nhre.demo', '+8801710001012', 'Patient123!', 'Patient'],
+        ['Patient 013', '1000000013', 'patient013@nhre.demo', '+8801710001013', 'Patient123!', 'Patient'],
+        ['Patient 014', '1000000014', 'patient014@nhre.demo', '+8801710001014', 'Patient123!', 'Patient'],
+        ['Patient 015', '1000000015', 'patient015@nhre.demo', '+8801710001015', 'Patient123!', 'Patient'],
+        ['Patient 016', '1000000016', 'patient016@nhre.demo', '+8801710001016', 'Patient123!', 'Patient'],
+        ['Patient 017', '1000000017', 'patient017@nhre.demo', '+8801710001017', 'Patient123!', 'Patient'],
+        ['Patient 018', '1000000018', 'patient018@nhre.demo', '+8801710001018', 'Patient123!', 'Patient'],
+        ['Patient 019', '1000000019', 'patient019@nhre.demo', '+8801710001019', 'Patient123!', 'Patient'],
+        ['Patient 020', '1000000020', 'patient020@nhre.demo', '+8801710001020', 'Patient123!', 'Patient'],
+        ['Patient 021', '1000000021', 'patient021@nhre.demo', '+8801710001021', 'Patient123!', 'Patient'],
+        ['Patient 022', '1000000022', 'patient022@nhre.demo', '+8801710001022', 'Patient123!', 'Patient'],
+        ['Patient 023', '1000000023', 'patient023@nhre.demo', '+8801710001023', 'Patient123!', 'Patient'],
+        ['Patient 024', '1000000024', 'patient024@nhre.demo', '+8801710001024', 'Patient123!', 'Patient'],
+        ['Patient 025', '1000000025', 'patient025@nhre.demo', '+8801710001025', 'Patient123!', 'Patient'],
+        ['Dr. Mohammad Ashraf Karim', '0000000002', 'admin@nhre.gov', '+8801710002002', 'Admin123!', 'Hospital Admin'],
+        ['Nusrat Jahan Chowdhury',   '0000000003', 'sysadmin@nhre.gov', '+8801710002003', 'SysAdmin123!', 'System Admin'],
+        ['Ahsanul Haque',            '0000000004', 'pharmacist@nhre.gov', '+8801710002004', 'Pharmacist123!', 'Pharmacist'],
+        ['Maksudul Islam',           '0000000005', 'lab@nhre.gov', '+8801710002005', 'Lab123!', 'Lab Technician'],
     ];
 
     try {
-        $stmt = db()->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-        $insert = db()->prepare(
+        $pdo = db();
+        $find = $pdo->prepare('SELECT id, fullname, email, phone, nid FROM users WHERE email = ? OR phone = ? OR nid = ? LIMIT 1');
+        $update = $pdo->prepare('UPDATE users SET fullname = ?, role = ?, nid = ?, phone = ?, password_hash = ? WHERE email = ? LIMIT 1');
+        $insert = $pdo->prepare(
             'INSERT INTO users (fullname, nid, email, phone, password_hash, role)
              VALUES (?, ?, ?, ?, ?, ?)'
         );
         foreach ($accounts as $account) {
-            $stmt->execute([$account[2]]);
-            if ($stmt->fetch()) {
+            [$fullname, $nid, $email, $phone, $password, $role] = $account;
+            $find->execute([$email, $phone, $nid]);
+            $existing = $find->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                $sameEmail = strtolower((string)($existing['email'] ?? '')) === strtolower($email);
+                if ($sameEmail) {
+                    $update->execute([$fullname, $role, $nid, $phone, password_hash($password, PASSWORD_DEFAULT), $email]);
+                }
                 continue;
             }
+
             $insert->execute([
-                $account[0],
-                $account[1],
-                $account[2],
-                $account[3],
-                password_hash($account[4], PASSWORD_DEFAULT),
-                $account[5],
+                $fullname,
+                $nid,
+                $email,
+                $phone,
+                password_hash($password, PASSWORD_DEFAULT),
+                $role,
             ]);
         }
     } catch (PDOException $e) {
@@ -816,6 +1337,21 @@ function get_patient_review(int $doctor_id, int $patient_id): ?array
     return $row ?: null;
 }
 
+function patient_has_completed_appointment_with_doctor(int $patient_id, int $doctor_id): bool
+{
+    try {
+        $stmt = db()->prepare(
+            'SELECT 1 FROM appointments
+             WHERE patient_id = ? AND doctor_id = ? AND status = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$patient_id, $doctor_id, 'Completed']);
+        return (bool)$stmt->fetchColumn();
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
 /** Font Awesome star row for a doctor's aggregate rating. */
 function render_rating_stars(?float $rating): string
 {
@@ -904,8 +1440,8 @@ function ensure_medical_test_tables_exists(): void
 
     try {
         db()->exec('UPDATE medical_tests mt JOIN vaccination_centers vc ON vc.district = mt.place SET mt.center_id = vc.id WHERE mt.center_id IS NULL');
-        $patientId = (int)db()->query("SELECT id FROM users WHERE email = 'patient@nhre.gov' AND role = 'Patient' LIMIT 1")->fetchColumn();
-        if ($patientId > 0) {
+        $patientId = default_patient_id_for_demo_seed();
+        if ($patientId !== null) {
             $seedBooking = db()->prepare('INSERT INTO medical_test_bookings (test_id, user_id, booking_date, booking_time, status, result_notes, created_at, updated_at) SELECT id, ?, ?, ?, ?, ?, NOW(), NOW() FROM medical_tests WHERE center_id IS NOT NULL ORDER BY id LIMIT 1');
             $statusCount = db()->prepare('SELECT COUNT(*) FROM medical_test_bookings WHERE user_id = ? AND status = ?');
             foreach ([
@@ -1168,8 +1704,8 @@ function ensure_vaccination_center_tables(): void
             );
             $assignment->execute([$techId, $techId]);
         }
-        $patientId = (int)db()->query("SELECT id FROM users WHERE email = 'patient@nhre.gov' AND role = 'Patient' LIMIT 1")->fetchColumn();
-        if ($patientId > 0) {
+        $patientId = default_patient_id_for_demo_seed();
+        if ($patientId !== null) {
             $seedBooking = db()->prepare('INSERT INTO vaccination_bookings (user_id, vaccine_name, dose_number, center_id, booking_date, booking_time, contact_phone, notes, status, created_at, updated_at) SELECT ?, ?, 1, id, ?, ?, ?, ?, ?, NOW(), NOW() FROM vaccination_centers WHERE name = ? LIMIT 1');
             $statusCount = db()->prepare('SELECT COUNT(*) FROM vaccination_bookings WHERE user_id = ? AND status = ?');
             foreach ([
