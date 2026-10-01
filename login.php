@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/auth/auth_check.php';
+ensure_demo_accounts();
 redirect_if_authenticated();
 
 $errors = session_pull('errors', []);
@@ -7,7 +8,7 @@ $old = session_pull('old', []);
 $success = session_pull('success');
 $error = session_pull('error');
 $demo_accounts = [
-    ['role' => 'Patient', 'fullname' => 'Patient A', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'badge' => 'primary', 'seed' => 'demo-patient-default', 'email_note' => 'Primary patient'],
+    ['role' => 'Patient', 'fullname' => 'Farhana Rahman', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'badge' => 'primary', 'seed' => 'patient-farhana-rahman', 'email_note' => 'Primary patient'],
     ['role' => 'Doctor', 'fullname' => 'Dr. Afsana Ahmed', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor123!', 'badge' => 'info', 'seed' => 'demo-doctor-001', 'email_note' => 'Primary doctor'],
     ['role' => 'Pharmacist', 'fullname' => 'Ahsanul Haque', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
     ['role' => 'Lab Technician', 'fullname' => 'Maksudul Islam', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],

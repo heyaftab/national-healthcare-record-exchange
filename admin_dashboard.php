@@ -3,12 +3,42 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth/auth_check.php';
 require_role(['Hospital Admin', 'System Admin']);
+ensure_appointments_table_exists();
+ensure_doctor_catalog_tables();
+ensure_realistic_demo_appointments();
 
 $userRole = (string)$_SESSION['role'];
 $userName = (string)$_SESSION['fullname'];
 $userId = (int)$_SESSION['user_id'];
 $hospital = null;
 $hospitalId = null;
+$totalHospitals = $totalPatients = $totalDoctors = $totalStaff = $pendingAppointments = $pendingAccessRequests = 0;
+$recentAppointments = [];
+$recentAudit = [];
+$nationalMetrics = nhre_national_platform_metrics();
+$totalHospitalsDisplay = $nationalMetrics['hospitals']['value'];
+$totalPatientsDisplay = $nationalMetrics['patients']['value'];
+$totalDoctorsDisplay = $nationalMetrics['doctors']['value'];
+$totalStaffDisplay = $nationalMetrics['staff']['value'];
+$pendingAppointmentsDisplay = '0';
+$pendingAccessRequestsDisplay = '0';
+
+function dashboard_patient_display_name(array $appointment): string
+{
+    $name = trim((string)($appointment['patient_name'] ?? ''));
+    $email = strtolower(trim((string)($appointment['patient_email'] ?? '')));
+    $demoNames = [
+        'patient@nhre.gov' => 'Farhana Rahman',
+        'patient002@nhre.demo' => 'Arif Hossain',
+        'patient003@nhre.demo' => 'Nadia Islam',
+    ];
+
+    if (isset($demoNames[$email]) && preg_match('/^Patient(?:\s+[A-Z]|\s+\d+)?$/i', $name)) {
+        return $demoNames[$email];
+    }
+
+    return $name !== '' ? $name : 'Unknown patient';
+}
 
 try {
     $pdo = db();
@@ -30,7 +60,9 @@ try {
         $count = $pdo->prepare("SELECT COUNT(*) FROM appointments a JOIN users d ON d.id = a.doctor_id WHERE a.status = 'Pending' AND d.hospital_id = ?");
         $count->execute([$hospitalId]); $pendingAppointments = (int)$count->fetchColumn();
         $recentStmt = $pdo->prepare(
-            "SELECT a.appointment_date, a.appointment_time, a.status, patient.fullname AS patient_name, doctor.fullname AS doctor_name
+            "SELECT a.appointment_date, a.appointment_time, a.status, patient.fullname AS patient_name,
+                    patient.email AS patient_email, patient.account_number AS patient_account_number,
+                    doctor.fullname AS doctor_name
              FROM appointments a JOIN users patient ON patient.id = a.patient_id JOIN users doctor ON doctor.id = a.doctor_id
              WHERE doctor.hospital_id = ? ORDER BY a.created_at DESC LIMIT 5"
         );
@@ -41,16 +73,20 @@ try {
         $totalDoctors = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'Doctor'")->fetchColumn();
         $totalStaff = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role IN ('Pharmacist', 'Lab Technician', 'Hospital Admin')")->fetchColumn();
         $pendingAppointments = (int)$pdo->query("SELECT COUNT(*) FROM appointments WHERE status = 'Pending'")->fetchColumn();
-        $pendingAccessRequests = (int)$pdo->query("SELECT COUNT(*) FROM access_permissions WHERE status = 'Pending'")->fetchColumn();
+        $pendingAccessRequests = (int)$pdo->query("SELECT COUNT(*) FROM access_permissions WHERE status IN ('Pending', 'Requested')")->fetchColumn();
+        $pendingAppointmentsDisplay = number_format($pendingAppointments);
+        $pendingAccessRequestsDisplay = number_format($pendingAccessRequests);
         $recentAppointments = $pdo->query(
-            "SELECT a.appointment_date, a.appointment_time, a.status, patient.fullname AS patient_name, doctor.fullname AS doctor_name
+            "SELECT a.appointment_date, a.appointment_time, a.status, patient.fullname AS patient_name,
+                    patient.email AS patient_email, patient.account_number AS patient_account_number,
+                    doctor.fullname AS doctor_name
          FROM appointments a
          JOIN users patient ON patient.id = a.patient_id
          JOIN users doctor ON doctor.id = a.doctor_id
          ORDER BY a.created_at DESC LIMIT 5"
         )->fetchAll();
         $recentAudit = $pdo->query(
-            "SELECT a.created_at, COALESCE(u.fullname, 'System') AS actor, a.action, COALESCE(a.details, '—') AS details
+            "SELECT a.created_at, COALESCE(u.fullname, 'System') AS actor, a.action, COALESCE(a.details, '-') AS details
              FROM audit_logs a
              LEFT JOIN users u ON u.id = a.user_id
              ORDER BY a.created_at DESC LIMIT 5"
@@ -68,7 +104,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administration Dashboard — NHRE</title>
+    <title>Administration Dashboard - NHRE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -109,12 +145,12 @@ try {
           <div class="row g-4 align-items-stretch">
             <div class="col-xl-8">
               <div class="row g-3 dashboard-cards summary-grid">
-                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Hospitals</span><div class="summary-card-icon"><i class="fa-solid fa-building"></i></div></div><div class="summary-value"><?= $totalHospitals ?? 0 ?></div><div class="summary-label">Active hospitals</div><div class="summary-foot"><span class="summary-positive">Live</span></div></article></div>
-                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Patients</span><div class="summary-card-icon"><i class="fa-solid fa-users"></i></div></div><div class="summary-value"><?= $totalPatients ?></div><div class="summary-label">Registered patients</div><div class="summary-foot"><span class="summary-positive">Updated</span></div></article></div>
-                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Doctors</span><div class="summary-card-icon"><i class="fa-solid fa-user-doctor"></i></div></div><div class="summary-value"><?= $totalDoctors ?></div><div class="summary-label">Registered doctors</div><div class="summary-foot"><span class="summary-positive">On call</span></div></article></div>
-                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Staff</span><div class="summary-card-icon"><i class="fa-solid fa-user-nurse"></i></div></div><div class="summary-value"><?= $totalStaff ?></div><div class="summary-label">Operational staff</div><div class="summary-foot"><span class="summary-positive">Ready</span></div></article></div>
-                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Appointments</span><div class="summary-card-icon"><i class="fa-solid fa-clock"></i></div></div><div class="summary-value"><?= $pendingAppointments ?></div><div class="summary-label">Pending appointments</div><div class="summary-foot"><span class="summary-positive">Queued</span></div></article></div>
-                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Access</span><div class="summary-card-icon"><i class="fa-solid fa-file-shield"></i></div></div><div class="summary-value"><?= $pendingAccessRequests ?? 0 ?></div><div class="summary-label">Pending access requests</div><div class="summary-foot"><span class="summary-positive">Review</span></div></article></div>
+                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Hospitals</span><div class="summary-card-icon"><i class="fa-solid fa-building"></i></div></div><div class="summary-value"><?= e($totalHospitalsDisplay) ?></div><div class="summary-label">Active hospitals</div><div class="summary-foot"><span class="summary-positive">National</span></div></article></div>
+                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Patients</span><div class="summary-card-icon"><i class="fa-solid fa-users"></i></div></div><div class="summary-value"><?= e($totalPatientsDisplay) ?></div><div class="summary-label">Registered patients</div><div class="summary-foot"><span class="summary-positive">National</span></div></article></div>
+                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Doctors</span><div class="summary-card-icon"><i class="fa-solid fa-user-doctor"></i></div></div><div class="summary-value"><?= e($totalDoctorsDisplay) ?></div><div class="summary-label">Registered doctors</div><div class="summary-foot"><span class="summary-positive">National</span></div></article></div>
+                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Staff</span><div class="summary-card-icon"><i class="fa-solid fa-user-nurse"></i></div></div><div class="summary-value"><?= e($totalStaffDisplay) ?></div><div class="summary-label">Operational staff</div><div class="summary-foot"><span class="summary-positive">National</span></div></article></div>
+                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Appointments</span><div class="summary-card-icon"><i class="fa-solid fa-clock"></i></div></div><div class="summary-value"><?= e($pendingAppointmentsDisplay) ?></div><div class="summary-label">Pending appointments</div><div class="summary-foot"><span class="summary-positive">Live queue</span></div></article></div>
+                <div class="col-md-6 col-xl-4"><article class="dashboard-card summary-card h-100"><div class="summary-card-head"><span class="summary-kicker">Access</span><div class="summary-card-icon"><i class="fa-solid fa-file-shield"></i></div></div><div class="summary-value"><?= e($pendingAccessRequestsDisplay) ?></div><div class="summary-label">Pending access requests</div><div class="summary-foot"><span class="summary-positive">Live queue</span></div></article></div>
               </div>
             </div>
             <div class="col-xl-4">
@@ -127,10 +163,10 @@ try {
                   <span class="live-badge">Live</span>
                 </div>
                 <ul class="mini-status-list">
-                  <li><span class="status-dot status-good"></span><div><strong><?= $totalHospitals ?? 0 ?></strong> active hospitals</div></li>
-                  <li><span class="status-dot status-warn"></span><div><strong><?= $pendingAppointments ?></strong> appointments awaiting review</div></li>
-                  <li><span class="status-dot status-alert"></span><div><strong><?= $pendingAccessRequests ?? 0 ?></strong> access requests pending approval</div></li>
-                  <li><span class="status-dot status-good"></span><div><strong><?= $totalDoctors ?></strong> clinicians registered</div></li>
+                  <li><span class="status-dot status-good"></span><div><strong><?= e($totalHospitalsDisplay) ?></strong> active hospitals</div></li>
+                  <li><span class="status-dot status-warn"></span><div><strong><?= e($pendingAppointmentsDisplay) ?></strong> appointments awaiting review</div></li>
+                  <li><span class="status-dot status-alert"></span><div><strong><?= e($pendingAccessRequestsDisplay) ?></strong> access requests pending approval</div></li>
+                  <li><span class="status-dot status-good"></span><div><strong><?= e($totalDoctorsDisplay) ?></strong> clinicians registered</div></li>
                 </ul>
                 <div class="mini-panel-footer">
                   <span>Platform status</span>
@@ -150,7 +186,7 @@ try {
               <div class="table-responsive"><table class="table table-hover align-middle m-0">
                   <thead class="table-light"><tr><th>Patient</th><th>Doctor</th><th>Date &amp; time</th><th>Status</th></tr></thead><tbody>
                   <?php foreach ($recentAppointments as $appointment): ?><tr>
-                      <td><?= e($appointment['patient_name']) ?></td><td><?= e($appointment['doctor_name']) ?></td>
+                      <td><span class="fw-semibold"><?= e(dashboard_patient_display_name($appointment)) ?></span><?php if (!empty($appointment['patient_account_number'])): ?><small class="d-block text-muted"><?= e($appointment['patient_account_number']) ?></small><?php endif; ?></td><td><?= e($appointment['doctor_name']) ?></td>
                       <td><?= e($appointment['appointment_date']) ?>, <?= e(substr((string)$appointment['appointment_time'], 0, 5)) ?></td>
                       <td><span class="badge text-bg-secondary"><?= e($appointment['status']) ?></span></td>
                   </tr><?php endforeach; ?>
@@ -203,7 +239,7 @@ try {
             <div class="table-responsive"><table class="table table-hover align-middle m-0">
                 <thead class="table-light"><tr><th>Patient</th><th>Doctor</th><th>Date &amp; time</th><th>Status</th></tr></thead><tbody>
                 <?php foreach ($recentAppointments as $appointment): ?><tr>
-                    <td><?= e($appointment['patient_name']) ?></td><td><?= e($appointment['doctor_name']) ?></td>
+                    <td><span class="fw-semibold"><?= e(dashboard_patient_display_name($appointment)) ?></span><?php if (!empty($appointment['patient_account_number'])): ?><small class="d-block text-muted"><?= e($appointment['patient_account_number']) ?></small><?php endif; ?></td><td><?= e($appointment['doctor_name']) ?></td>
                     <td><?= e($appointment['appointment_date']) ?>, <?= e(substr((string)$appointment['appointment_time'], 0, 5)) ?></td>
                     <td><span class="badge text-bg-secondary"><?= e($appointment['status']) ?></span></td>
                 </tr><?php endforeach; ?>

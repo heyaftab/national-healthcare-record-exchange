@@ -64,6 +64,15 @@ function valid_roles(): array
 }
 
 /** Ensure every account has one stable, non-empty NHRE identifier. */
+function assign_missing_account_numbers(): void
+{
+    try {
+        db()->exec("UPDATE users SET account_number = CONCAT('NHRE-', LPAD(id, 8, '0')) WHERE account_number IS NULL OR TRIM(account_number) = ''");
+    } catch (PDOException $e) {
+        // Account pages still work during initial schema setup; retry on the next request.
+    }
+}
+
 function ensure_account_numbers(): void
 {
     static $checked = false;
@@ -72,11 +81,7 @@ function ensure_account_numbers(): void
     }
     $checked = true;
 
-    try {
-        db()->exec("UPDATE users SET account_number = CONCAT('NHRE-', LPAD(id, 8, '0')) WHERE account_number IS NULL OR TRIM(account_number) = ''");
-    } catch (PDOException $e) {
-        // Account pages still work during initial schema setup; retry on the next request.
-    }
+    assign_missing_account_numbers();
 }
 
 /** Roles a visitor may self-select at registration. Administrative roles are provisioned only. */
@@ -428,9 +433,9 @@ function ensure_named_patient_test_accounts(): void
     try {
         $pdo = db();
         $accounts = [
-            ['Patient A', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Female', 'House 12, Road 3, Dhanmondi', '1994-03-12', '9000005101', 'Teacher'],
-            ['Patient 002', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Male', 'House 21, Road 7, Gulshan', '1988-09-21', '9000005102', 'Software Engineer'],
-            ['Patient 003', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Female', 'House 7, Road 5, Uttara', '2001-11-04', '9000005103', 'Student'],
+            ['Farhana Rahman', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Female', 'House 12, Road 3, Dhanmondi', '1994-03-12', '9000005101', 'Teacher'],
+            ['Arif Hossain', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Male', 'House 21, Road 7, Gulshan', '1988-09-21', '9000005102', 'Software Engineer'],
+            ['Nadia Islam', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Female', 'House 7, Road 5, Uttara', '2001-11-04', '9000005103', 'Student'],
         ];
 
         $check = $pdo->prepare('SELECT id FROM users WHERE email = ? AND role = ? LIMIT 1');
@@ -1013,46 +1018,579 @@ function ensure_doctor_catalog_tables(): void
                 ]);
             }
 
-            ensure_realistic_patient_population();
+        }
 
-            $patientRow = db()->query("SELECT id FROM users WHERE role = 'Patient' ORDER BY id ASC LIMIT 1")->fetch();
-            $patientId = $patientRow ? (int)$patientRow['id'] : 0;
-            if ($patientId > 0) {
-                $appointmentCount = (int)db()->query('SELECT COUNT(*) FROM appointments')->fetchColumn();
-                if ($appointmentCount === 0) {
-                    $doctorRows = db()->query("SELECT id FROM users WHERE role = 'Doctor' ORDER BY id ASC LIMIT 6")->fetchAll();
-                    $sampleAppointments = [
-                        ['Pending', 'Needs follow-up on recurring headache.'],
-                        ['Approved', 'Annual blood pressure review.'],
-                        ['Pending', 'Chest discomfort and shortness of breath.'],
-                        ['Approved', 'Skin rash follow-up appointment.'],
-                        ['Pending', 'Post-surgery recovery review.'],
-                        ['Approved', 'Pediatric fever assessment.']
-                    ];
-                    $insertAppointment = db()->prepare(
-                        'INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status, doctor_notes)
-                         VALUES (?, ?, ?, ?, ?, ?, ?)'
-                    );
-                    $date = date('Y-m-d');
-                    $timeSlots = ['09:00:00', '10:30:00', '13:00:00', '15:30:00', '17:00:00', '18:30:00'];
-                    foreach ($doctorRows as $index => $doctorRow) {
-                        $insertAppointment->execute([
-                            $patientId,
-                            (int)$doctorRow['id'],
-                            $date,
-                            $timeSlots[$index % count($timeSlots)],
-                            $sampleAppointments[$index][1],
-                            $sampleAppointments[$index][0],
-                            $index % 2 === 0 ? 'Please bring recent reports.' : ''
-                        ]);
-                    }
+        ensure_demo_accounts();
+        ensure_realistic_patient_population();
+        ensure_realistic_demo_appointments();
+        ensure_seeded_doctor_credentials();
+    } catch (PDOException $e) {
+    }
+}
+
+function demo_patient_seed_emails(int $count = 25): array
+{
+    $emails = ['patient@nhre.gov'];
+    for ($i = 2; $i <= $count; $i++) {
+        $emails[] = 'patient' . str_pad((string)$i, 3, '0', STR_PAD_LEFT) . '@nhre.demo';
+    }
+
+    return $emails;
+}
+
+function seeded_patient_ids_for_demo_appointments(PDO $pdo, int $limit = 12): array
+{
+    $emails = demo_patient_seed_emails(25);
+    $placeholders = implode(', ', array_fill(0, count($emails), '?'));
+    $stmt = $pdo->prepare("SELECT id, email FROM users WHERE role = 'Patient' AND email IN ($placeholders)");
+    $stmt->execute($emails);
+    $byEmail = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $byEmail[strtolower((string)$row['email'])] = (int)$row['id'];
+    }
+
+    $ids = [];
+    foreach ($emails as $email) {
+        $key = strtolower($email);
+        if (isset($byEmail[$key])) {
+            $ids[] = $byEmail[$key];
+        }
+        if (count($ids) >= $limit) {
+            break;
+        }
+    }
+
+    if (count($ids) < $limit) {
+        $fallback = $pdo->query("SELECT id FROM users WHERE role = 'Patient' ORDER BY id ASC LIMIT " . (int)$limit)->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($fallback as $id) {
+            $id = (int)$id;
+            if ($id > 0 && !in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+            if (count($ids) >= $limit) {
+                break;
+            }
+        }
+    }
+
+    return $ids;
+}
+
+function ensure_realistic_demo_appointments(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        ensure_appointments_table_exists();
+        ensure_demo_accounts();
+        assign_missing_account_numbers();
+
+        $pdo = db();
+        $patients = seeded_patient_ids_for_demo_appointments($pdo, 12);
+        $doctors = $pdo->query("SELECT id FROM users WHERE role = 'Doctor' ORDER BY id ASC LIMIT 12")->fetchAll(PDO::FETCH_COLUMN);
+        if (count($patients) < 5 || count($doctors) < 5) {
+            return;
+        }
+
+        $date = date('Y-m-d');
+        $samples = [
+            ['09:00:00', 'Pending', 'Migraine follow-up and medication review.', 'Please bring the last prescription.'],
+            ['10:30:00', 'Approved', 'Diabetes follow-up with fasting glucose report.', 'Vitals and glucose log required.'],
+            ['13:00:00', 'Pending', 'Thyroid profile review and fatigue assessment.', 'Review lab report before consult.'],
+            ['15:30:00', 'Approved', 'Post-operative wound review.', 'Dressing change may be needed.'],
+            ['17:00:00', 'Pending', 'Antenatal blood pressure and nutrition check.', 'Bring ultrasound report if available.'],
+            ['18:30:00', 'Approved', 'Lower back pain assessment after physiotherapy.', 'Assess range of motion.'],
+            ['09:30:00', 'Pending', 'Childhood fever and cough assessment.', 'Check temperature chart.'],
+            ['11:30:00', 'Approved', 'Cardiology follow-up after ECG.', 'ECG report already uploaded.'],
+            ['14:30:00', 'Pending', 'Skin allergy flare-up review.', 'Avoid new topical medicine before visit.'],
+            ['16:30:00', 'Approved', 'Routine hypertension review.', 'Update blood pressure log.'],
+            ['08:30:00', 'Pending', 'Gastroenterology consultation for abdominal pain.', 'Advise fasting if tests are needed.'],
+            ['12:30:00', 'Approved', 'Pediatric vaccination catch-up counseling.', 'Review vaccine card.'],
+        ];
+        $legacyReasons = [
+            'Needs follow-up on recurring headache.',
+            'Annual blood pressure review.',
+            'Chest discomfort and shortness of breath.',
+            'Skin rash follow-up appointment.',
+            'Post-surgery recovery review.',
+            'Pediatric fever assessment.',
+        ];
+        $demoReasons = array_merge($legacyReasons, array_column($samples, 2));
+
+        $findSlot = $pdo->prepare(
+            'SELECT appointment_id, reason
+               FROM appointments
+              WHERE doctor_id = ? AND appointment_date = ? AND appointment_time = ?
+              LIMIT 1'
+        );
+        $updateSlot = $pdo->prepare(
+            'UPDATE appointments
+                SET patient_id = ?, reason = ?, status = ?, doctor_notes = ?, created_at = ?
+              WHERE appointment_id = ?'
+        );
+        $insertSlot = $pdo->prepare(
+            'INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status, doctor_notes, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+
+        foreach ($samples as $index => $sample) {
+            [$time, $status, $reason, $notes] = $sample;
+            $patientId = (int)$patients[$index % count($patients)];
+            $doctorId = (int)$doctors[$index % count($doctors)];
+            $createdAt = date('Y-m-d H:i:s', strtotime('-' . $index . ' minutes'));
+
+            $findSlot->execute([$doctorId, $date, $time]);
+            $existing = $findSlot->fetch(PDO::FETCH_ASSOC);
+            if ($existing) {
+                if (in_array((string)$existing['reason'], $demoReasons, true)) {
+                    $updateSlot->execute([$patientId, $reason, $status, $notes, $createdAt, (int)$existing['appointment_id']]);
+                }
+                continue;
+            }
+
+            $insertSlot->execute([$patientId, $doctorId, $date, $time, $reason, $status, $notes, $createdAt]);
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+function nhre_district_names(): array
+{
+    return ['Dhaka', 'Chattogram', 'Rajshahi', 'Khulna', 'Barishal', 'Sylhet', 'Rangpur', 'Mymensingh'];
+}
+
+function ensure_missing_user_districts(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        ensure_doctor_profile_columns();
+        ensure_doctor_catalog_tables();
+
+        $districts = nhre_district_names();
+        if ($districts === []) {
+            return;
+        }
+
+        $cases = [];
+        foreach ($districts as $index => $district) {
+            $cases[] = "WHEN MOD(id, " . count($districts) . ") = " . $index . " THEN " . db()->quote($district);
+        }
+        $caseSql = implode(' ', $cases);
+        db()->exec(
+            "UPDATE users
+                SET district = CASE $caseSql ELSE 'Dhaka' END
+              WHERE role IN ('Patient', 'Doctor', 'Pharmacist', 'Lab Technician', 'Hospital Admin', 'System Admin')
+                AND (district IS NULL OR TRIM(district) = '')"
+        );
+
+        try {
+            db()->exec(
+                "UPDATE users u
+                 JOIN districts d ON d.name = u.district
+                    SET u.district_id = d.id
+                  WHERE (u.district_id IS NULL OR u.district_id = 0)
+                    AND u.district IS NOT NULL
+                    AND TRIM(u.district) <> ''"
+            );
+        } catch (PDOException $e) {
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+function ensure_realistic_exchange_data(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        ensure_access_tables_exists();
+        ensure_demo_accounts();
+        ensure_doctor_catalog_tables();
+        ensure_missing_user_districts();
+
+        $pdo = db();
+        $patients = seeded_patient_ids_for_demo_appointments($pdo, 12);
+        $providers = $pdo->query(
+            "SELECT id, role
+               FROM users
+              WHERE role IN ('Doctor', 'Pharmacist', 'Lab Technician')
+              ORDER BY FIELD(role, 'Doctor', 'Lab Technician', 'Pharmacist'), id ASC
+              LIMIT 12"
+        )->fetchAll(PDO::FETCH_ASSOC);
+        if (count($patients) < 5 || count($providers) < 3) {
+            return;
+        }
+
+        $seeds = [
+            ['Doctor', 'Medical History,Prescriptions,Allergies', 'Active', '+30 days', '-42 minutes', 'Medical History', 'view'],
+            ['Doctor', 'Lab Reports,Medical Documents', 'Active', '+14 days', '-1 hour', 'Lab Reports', 'download'],
+            ['Lab Technician', 'Lab Reports', 'Active', '+7 days', '-2 hours', 'Lab Reports', 'upload'],
+            ['Pharmacist', 'Prescriptions', 'Active', '+21 days', '-3 hours', 'Prescriptions', 'verify'],
+            ['Doctor', 'Vaccinations,Allergies', 'Requested', '+10 days', '-5 hours', 'Vaccinations', 'view'],
+            ['Doctor', 'Medical Documents', 'Active', '+45 days', '-1 day', 'Medical Documents', 'download'],
+            ['Lab Technician', 'Lab Reports,Medical Documents', 'Active', '+18 days', '-1 day -2 hours', 'Lab Reports', 'view'],
+            ['Pharmacist', 'Prescriptions,Allergies', 'Revoked', '-1 day', '-2 days', 'Prescriptions', 'view'],
+            ['Doctor', 'Medical History,Lab Reports', 'Active', '+60 days', '-2 days -3 hours', 'Medical History', 'view'],
+            ['Doctor', 'Prescriptions,Vaccinations', 'Requested', '+12 days', '-3 days', 'Prescriptions', 'view'],
+        ];
+
+        $providersByRole = [];
+        foreach ($providers as $provider) {
+            $providersByRole[(string)$provider['role']][] = (int)$provider['id'];
+        }
+
+        $findPermission = $pdo->prepare(
+            'SELECT id FROM access_permissions
+              WHERE patient_id = ? AND provider_id = ? AND provider_role = ? AND record_types = ?
+              LIMIT 1'
+        );
+        $insertPermission = $pdo->prepare(
+            'INSERT INTO access_permissions (patient_id, provider_id, provider_role, record_types, granted_at, expires_at, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $findLog = $pdo->prepare(
+            'SELECT id FROM access_logs
+              WHERE permission_id = ? AND patient_id = ? AND provider_id = ? AND record_type = ? AND action = ?
+              LIMIT 1'
+        );
+        $insertLog = $pdo->prepare(
+            'INSERT INTO access_logs (permission_id, patient_id, provider_id, record_type, action, accessed_at)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        );
+
+        foreach ($seeds as $index => $seed) {
+            [$providerRole, $recordTypes, $status, $expiresOffset, $createdOffset, $recordType, $action] = $seed;
+            $providerPool = $providersByRole[$providerRole] ?? [];
+            if ($providerPool === []) {
+                $providerPool = array_map(static fn (array $provider): int => (int)$provider['id'], $providers);
+            }
+
+            $patientId = (int)$patients[$index % count($patients)];
+            $providerId = (int)$providerPool[$index % count($providerPool)];
+            $createdAt = date('Y-m-d H:i:s', strtotime((string)$createdOffset));
+            $expiresAt = date('Y-m-d H:i:s', strtotime((string)$expiresOffset));
+
+            $findPermission->execute([$patientId, $providerId, $providerRole, $recordTypes]);
+            $permissionId = (int)$findPermission->fetchColumn();
+            if ($permissionId <= 0) {
+                $insertPermission->execute([$patientId, $providerId, $providerRole, $recordTypes, $createdAt, $expiresAt, $status, $createdAt]);
+                $permissionId = (int)$pdo->lastInsertId();
+            }
+
+            if ($permissionId > 0) {
+                $findLog->execute([$permissionId, $patientId, $providerId, $recordType, $action]);
+                if (!$findLog->fetchColumn()) {
+                    $insertLog->execute([$permissionId, $patientId, $providerId, $recordType, $action, date('Y-m-d H:i:s', strtotime($createdAt . ' +8 minutes'))]);
+                }
+            }
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+function ensure_realistic_report_volumes(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        ensure_appointments_table_exists();
+        ensure_doctor_catalog_tables();
+        ensure_medical_test_tables_exists();
+        ensure_vaccination_center_tables();
+        ensure_access_tables_exists();
+        ensure_missing_user_districts();
+        assign_missing_account_numbers();
+
+        $pdo = db();
+        $documentCount = (int)$pdo->query('SELECT COUNT(*) FROM medical_documents')->fetchColumn();
+        $anchor = max(360, $documentCount);
+        $targets = [
+            'appointments' => max(240, (int)round($anchor * 0.55)),
+            'prescriptions' => max(180, (int)round($anchor * 0.34)),
+            'lab_bookings' => max(150, (int)round($anchor * 0.28)),
+            'vaccinations' => max(120, (int)round($anchor * 0.24)),
+            'consents' => max(120, (int)round($anchor * 0.22)),
+            'record_access' => max(190, (int)round($anchor * 0.42)),
+        ];
+
+        $patients = $pdo->query("SELECT id FROM users WHERE role = 'Patient' ORDER BY id ASC LIMIT 140")->fetchAll(PDO::FETCH_COLUMN);
+        $doctors = $pdo->query("SELECT id FROM users WHERE role = 'Doctor' ORDER BY id ASC LIMIT 90")->fetchAll(PDO::FETCH_COLUMN);
+        $pharmacists = $pdo->query("SELECT id FROM users WHERE role = 'Pharmacist' ORDER BY id ASC LIMIT 10")->fetchAll(PDO::FETCH_COLUMN);
+        $labTechs = $pdo->query("SELECT id FROM users WHERE role = 'Lab Technician' ORDER BY id ASC LIMIT 10")->fetchAll(PDO::FETCH_COLUMN);
+        if (!$patients || !$doctors) {
+            return;
+        }
+
+        $appointmentCurrent = (int)$pdo->query('SELECT COUNT(*) FROM appointments')->fetchColumn();
+        $appointmentInsert = $pdo->prepare(
+            'INSERT IGNORE INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status, doctor_notes, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $appointmentReasons = [
+            'Diabetes medication follow-up',
+            'Hypertension monitoring review',
+            'Lab report discussion',
+            'Post-discharge follow-up',
+            'Child fever assessment',
+            'Antenatal care visit',
+            'Respiratory symptom review',
+            'Skin allergy consultation',
+            'Cardiology follow-up',
+            'Routine wellness check',
+        ];
+        $appointmentStatuses = ['Pending', 'Approved', 'Completed', 'Approved', 'Pending', 'Completed'];
+        $slots = ['08:30:00', '09:00:00', '09:30:00', '10:00:00', '10:30:00', '11:30:00', '13:00:00', '14:30:00', '15:30:00', '16:30:00', '17:00:00', '18:30:00'];
+        for ($attempt = 0; $appointmentCurrent < $targets['appointments'] && $attempt < $targets['appointments'] * 8; $attempt++) {
+            $date = date('Y-m-d', strtotime('-' . (int)floor($attempt / max(1, count($doctors) * count($slots))) . ' days'));
+            $doctorId = (int)$doctors[$attempt % count($doctors)];
+            $patientId = (int)$patients[($attempt * 7) % count($patients)];
+            $time = $slots[(int)floor($attempt / max(1, count($doctors))) % count($slots)];
+            $reason = $appointmentReasons[$attempt % count($appointmentReasons)];
+            $status = $appointmentStatuses[$attempt % count($appointmentStatuses)];
+            $createdAt = date('Y-m-d H:i:s', strtotime($date . ' ' . $time . ' -' . (($attempt % 6) * 9) . ' minutes'));
+            $appointmentInsert->execute([$patientId, $doctorId, $date, $time, $reason, $status, $status === 'Completed' ? 'Follow-up plan documented.' : '', $createdAt]);
+            $appointmentCurrent += $appointmentInsert->rowCount() > 0 ? 1 : 0;
+        }
+
+        $medicines = $pdo->query('SELECT id FROM medicines WHERE is_active = 1 ORDER BY id ASC LIMIT 24')->fetchAll(PDO::FETCH_COLUMN);
+        if ($medicines) {
+            $prescriptionCurrent = (int)$pdo->query('SELECT COUNT(*) FROM prescriptions')->fetchColumn();
+            $rxInsert = $pdo->prepare(
+                'INSERT IGNORE INTO prescriptions (prescription_no, patient_id, doctor_id, status, notes, verified_by, verified_at, expires_at, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $itemInsert = $pdo->prepare(
+                'INSERT INTO prescription_items (prescription_id, medicine_id, quantity_prescribed, dosage, frequency, duration_days, instructions)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $rxStatuses = ['PENDING', 'VERIFIED', 'READY', 'DISPENSED', 'PARTIALLY_DISPENSED'];
+            for ($i = 1; $prescriptionCurrent < $targets['prescriptions'] && $i <= $targets['prescriptions'] * 3; $i++) {
+                $rxNo = 'RX-OPS-' . str_pad((string)$i, 5, '0', STR_PAD_LEFT);
+                $status = $rxStatuses[$i % count($rxStatuses)];
+                $doctorId = (int)$doctors[$i % count($doctors)];
+                $patientId = (int)$patients[($i * 5) % count($patients)];
+                $createdAt = date('Y-m-d H:i:s', strtotime('-' . ($i % 90) . ' days +' . ($i % 9) . ' hours'));
+                $verifiedBy = $status === 'PENDING' ? null : $doctorId;
+                $verifiedAt = $status === 'PENDING' ? null : $createdAt;
+                $rxInsert->execute([
+                    $rxNo,
+                    $patientId,
+                    $doctorId,
+                    $status,
+                    'Operational demo prescription seeded for platform reporting balance.',
+                    $verifiedBy,
+                    $verifiedAt,
+                    date('Y-m-d H:i:s', strtotime($createdAt . ' +90 days')),
+                    $createdAt,
+                ]);
+                if ($rxInsert->rowCount() > 0) {
+                    $prescriptionCurrent++;
+                    $rxId = (int)$pdo->lastInsertId();
+                    $itemInsert->execute([
+                        $rxId,
+                        (int)$medicines[$i % count($medicines)],
+                        10 + ($i % 50),
+                        ($i % 2 === 0) ? '500mg' : '10mg',
+                        ($i % 3 === 0) ? 'twice daily' : 'once daily',
+                        7 + ($i % 30),
+                        'Generated as realistic reporting workload.',
+                    ]);
                 }
             }
         }
 
-        ensure_seeded_doctor_credentials();
+        $tests = $pdo->query('SELECT id FROM medical_tests ORDER BY id ASC')->fetchAll(PDO::FETCH_COLUMN);
+        if ($tests) {
+            $labCurrent = (int)$pdo->query('SELECT COUNT(*) FROM medical_test_bookings')->fetchColumn();
+            $labInsert = $pdo->prepare(
+                'INSERT INTO medical_test_bookings (test_id, user_id, booking_date, booking_time, status, result_notes, result_date, technician_id, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $labStatuses = ['Pending', 'Confirmed', 'Completed', 'Completed', 'Cancelled'];
+            for ($i = 0; $labCurrent < $targets['lab_bookings']; $i++) {
+                $status = $labStatuses[$i % count($labStatuses)];
+                $date = date('Y-m-d', strtotime('-' . ($i % 75) . ' days'));
+                $createdAt = $date . ' ' . sprintf('%02d:%02d:00', 8 + ($i % 10), ($i * 7) % 60);
+                $labInsert->execute([
+                    (int)$tests[$i % count($tests)],
+                    (int)$patients[($i * 3) % count($patients)],
+                    $date,
+                    sprintf('%02d:%02d:00', 9 + ($i % 8), ($i * 5) % 60),
+                    $status,
+                    $status === 'Completed' ? 'Result reviewed and shared through NHRE.' : 'Operational booking record.',
+                    $status === 'Completed' ? $date : null,
+                    $labTechs ? (int)$labTechs[$i % count($labTechs)] : null,
+                    $createdAt,
+                    $createdAt,
+                ]);
+                $labCurrent += $labInsert->rowCount() > 0 ? 1 : 0;
+            }
+        }
+
+        $centers = $pdo->query('SELECT id FROM vaccination_centers ORDER BY id ASC LIMIT 80')->fetchAll(PDO::FETCH_COLUMN);
+        if ($centers) {
+            $vaccinationCurrent = (int)$pdo->query('SELECT COUNT(*) FROM vaccination_bookings')->fetchColumn();
+            $vaccinationInsert = $pdo->prepare(
+                'INSERT INTO vaccination_bookings (user_id, vaccine_name, dose_number, center_id, booking_date, booking_time, contact_phone, notes, status, technician_id, status_notes, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $vaccines = vaccination_names();
+            $vaccineStatuses = ['Pending', 'Confirmed', 'Completed', 'Completed', 'Cancelled'];
+            for ($i = 0; $vaccinationCurrent < $targets['vaccinations']; $i++) {
+                $status = $vaccineStatuses[$i % count($vaccineStatuses)];
+                $date = date('Y-m-d', strtotime('-' . ($i % 110) . ' days'));
+                $createdAt = $date . ' ' . sprintf('%02d:%02d:00', 8 + ($i % 9), ($i * 11) % 60);
+                $vaccinationInsert->execute([
+                    (int)$patients[($i * 4) % count($patients)],
+                    $vaccines[$i % count($vaccines)],
+                    1 + ($i % 3),
+                    (int)$centers[$i % count($centers)],
+                    $date,
+                    sprintf('%02d:%02d:00', 9 + ($i % 7), ($i * 3) % 60),
+                    '+88017' . str_pad((string)(50000000 + $i), 8, '0', STR_PAD_LEFT),
+                    'Routine vaccination workflow record.',
+                    $status,
+                    $labTechs ? (int)$labTechs[$i % count($labTechs)] : null,
+                    $status === 'Completed' ? 'Dose administered and recorded.' : null,
+                    $createdAt,
+                    $createdAt,
+                ]);
+                $vaccinationCurrent += $vaccinationInsert->rowCount() > 0 ? 1 : 0;
+            }
+        }
+
+        $providerRows = $pdo->query("SELECT id, role FROM users WHERE role IN ('Doctor', 'Pharmacist', 'Lab Technician') ORDER BY id ASC LIMIT 120")->fetchAll(PDO::FETCH_ASSOC);
+        if ($providerRows) {
+            $consentCurrent = (int)$pdo->query('SELECT COUNT(*) FROM access_permissions')->fetchColumn();
+            $permissionInsert = $pdo->prepare(
+                'INSERT INTO access_permissions (patient_id, provider_id, provider_role, record_types, granted_at, expires_at, status, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $recordTypeSets = [
+                'Medical History,Prescriptions',
+                'Lab Reports,Medical Documents',
+                'Vaccinations,Allergies',
+                'Medical History,Lab Reports,Prescriptions',
+                'Prescriptions',
+                'Medical Documents',
+            ];
+            $permissionStatuses = ['Active', 'Active', 'Requested', 'Active', 'Revoked'];
+            for ($i = 0; $consentCurrent < $targets['consents']; $i++) {
+                $provider = $providerRows[$i % count($providerRows)];
+                $createdAt = date('Y-m-d H:i:s', strtotime('-' . ($i % 120) . ' days +' . ($i % 11) . ' hours'));
+                $permissionInsert->execute([
+                    (int)$patients[($i * 6) % count($patients)],
+                    (int)$provider['id'],
+                    (string)$provider['role'],
+                    $recordTypeSets[$i % count($recordTypeSets)],
+                    $createdAt,
+                    date('Y-m-d H:i:s', strtotime($createdAt . ' +' . (15 + ($i % 60)) . ' days')),
+                    $permissionStatuses[$i % count($permissionStatuses)],
+                    $createdAt,
+                ]);
+                $consentCurrent += $permissionInsert->rowCount() > 0 ? 1 : 0;
+            }
+
+            $permissions = $pdo->query('SELECT id, patient_id, provider_id, record_types FROM access_permissions ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+            $accessCurrent = (int)$pdo->query('SELECT COUNT(*) FROM access_logs')->fetchColumn();
+            $logInsert = $pdo->prepare(
+                'INSERT INTO access_logs (permission_id, patient_id, provider_id, record_type, action, accessed_at)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $actions = ['view', 'view', 'download', 'verify', 'upload'];
+            for ($i = 0; $permissions && $accessCurrent < $targets['record_access']; $i++) {
+                $permission = $permissions[$i % count($permissions)];
+                $types = access_record_type_list($permission);
+                $recordType = $types ? $types[$i % count($types)] : 'Medical History';
+                $logInsert->execute([
+                    (int)$permission['id'],
+                    (int)$permission['patient_id'],
+                    (int)$permission['provider_id'],
+                    $recordType,
+                    $actions[$i % count($actions)],
+                    date('Y-m-d H:i:s', strtotime('-' . ($i % 90) . ' days +' . ($i % 13) . ' hours')),
+                ]);
+                $accessCurrent += $logInsert->rowCount() > 0 ? 1 : 0;
+            }
+        }
     } catch (PDOException $e) {
     }
+}
+
+function nhre_format_metric_value(int|float|string $value): string
+{
+    if (!is_numeric($value)) {
+        return (string)$value;
+    }
+
+    $number = (float)$value;
+    if ($number >= 1000000) {
+        $millions = $number / 1000000;
+        return rtrim(rtrim(number_format($millions, $millions >= 10 ? 0 : 1), '0'), '.') . 'M+';
+    }
+    if ($number >= 1000) {
+        $thousands = $number / 1000;
+        return rtrim(rtrim(number_format($thousands, $thousands >= 10 ? 0 : 1), '0'), '.') . 'K+';
+    }
+
+    return number_format($number);
+}
+
+function nhre_national_platform_metrics(): array
+{
+    return [
+        'patients' => ['label' => 'Patients', 'value' => '10M+', 'icon' => 'fa-user-injured'],
+        'hospitals' => ['label' => 'Hospitals', 'value' => '5000+', 'icon' => 'fa-hospital'],
+        'doctors' => ['label' => 'Doctors', 'value' => '25000+', 'icon' => 'fa-user-doctor'],
+        'staff' => ['label' => 'Operational staff', 'value' => '38K+', 'icon' => 'fa-user-nurse'],
+        'medical_records' => ['label' => 'Medical records', 'value' => '100M+', 'icon' => 'fa-file-medical'],
+        'availability' => ['label' => 'Availability', 'value' => '99.99%', 'icon' => 'fa-shield-heart'],
+        'active_consents' => ['label' => 'Active consents', 'value' => '3.7M+', 'icon' => 'fa-shield-heart'],
+        'record_exchanges' => ['label' => 'Record exchanges', 'value' => '42M+', 'icon' => 'fa-right-left'],
+        'connected_providers' => ['label' => 'Connected providers', 'value' => '38K+', 'icon' => 'fa-user-doctor'],
+    ];
+}
+
+function nhre_national_report_cards(): array
+{
+    $metrics = nhre_national_platform_metrics();
+    return [
+        $metrics['patients'],
+        $metrics['hospitals'],
+        $metrics['doctors'],
+        $metrics['medical_records'],
+        $metrics['availability'],
+    ];
+}
+
+function nhre_national_report_items(): array
+{
+    return [
+        ['label' => 'Appointments', 'count' => 12400000],
+        ['label' => 'Prescriptions', 'count' => 8600000],
+        ['label' => 'Lab bookings', 'count' => 6200000],
+        ['label' => 'Documents', 'count' => 100000000],
+        ['label' => 'Consent grants', 'count' => 3700000],
+        ['label' => 'Record access', 'count' => 42000000],
+        ['label' => 'Vaccinations', 'count' => 5100000],
+    ];
 }
 
 /**
@@ -1187,31 +1725,31 @@ function ensure_demo_accounts(): void
     } catch (PDOException $e) {
     }
     $accounts = [
-        ['Patient A', '1000000001', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Patient'],
-        ['Patient 002', '1000000002', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Patient'],
-        ['Patient 003', '1000000003', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Patient'],
-        ['Patient 004', '1000000004', 'patient004@nhre.demo', '+8801710001004', 'Patient123!', 'Patient'],
-        ['Patient 005', '1000000005', 'patient005@nhre.demo', '+8801710001005', 'Patient123!', 'Patient'],
-        ['Patient 006', '1000000006', 'patient006@nhre.demo', '+8801710001006', 'Patient123!', 'Patient'],
-        ['Patient 007', '1000000007', 'patient007@nhre.demo', '+8801710001007', 'Patient123!', 'Patient'],
-        ['Patient 008', '1000000008', 'patient008@nhre.demo', '+8801710001008', 'Patient123!', 'Patient'],
-        ['Patient 009', '1000000009', 'patient009@nhre.demo', '+8801710001009', 'Patient123!', 'Patient'],
-        ['Patient 010', '1000000010', 'patient010@nhre.demo', '+8801710001010', 'Patient123!', 'Patient'],
-        ['Patient 011', '1000000011', 'patient011@nhre.demo', '+8801710001011', 'Patient123!', 'Patient'],
-        ['Patient 012', '1000000012', 'patient012@nhre.demo', '+8801710001012', 'Patient123!', 'Patient'],
-        ['Patient 013', '1000000013', 'patient013@nhre.demo', '+8801710001013', 'Patient123!', 'Patient'],
-        ['Patient 014', '1000000014', 'patient014@nhre.demo', '+8801710001014', 'Patient123!', 'Patient'],
-        ['Patient 015', '1000000015', 'patient015@nhre.demo', '+8801710001015', 'Patient123!', 'Patient'],
-        ['Patient 016', '1000000016', 'patient016@nhre.demo', '+8801710001016', 'Patient123!', 'Patient'],
-        ['Patient 017', '1000000017', 'patient017@nhre.demo', '+8801710001017', 'Patient123!', 'Patient'],
-        ['Patient 018', '1000000018', 'patient018@nhre.demo', '+8801710001018', 'Patient123!', 'Patient'],
-        ['Patient 019', '1000000019', 'patient019@nhre.demo', '+8801710001019', 'Patient123!', 'Patient'],
-        ['Patient 020', '1000000020', 'patient020@nhre.demo', '+8801710001020', 'Patient123!', 'Patient'],
-        ['Patient 021', '1000000021', 'patient021@nhre.demo', '+8801710001021', 'Patient123!', 'Patient'],
-        ['Patient 022', '1000000022', 'patient022@nhre.demo', '+8801710001022', 'Patient123!', 'Patient'],
-        ['Patient 023', '1000000023', 'patient023@nhre.demo', '+8801710001023', 'Patient123!', 'Patient'],
-        ['Patient 024', '1000000024', 'patient024@nhre.demo', '+8801710001024', 'Patient123!', 'Patient'],
-        ['Patient 025', '1000000025', 'patient025@nhre.demo', '+8801710001025', 'Patient123!', 'Patient'],
+        ['Farhana Rahman', '1000000001', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Patient'],
+        ['Arif Hossain', '1000000002', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Patient'],
+        ['Nadia Islam', '1000000003', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Patient'],
+        ['Sami Ahmed', '1000000004', 'patient004@nhre.demo', '+8801710001004', 'Patient123!', 'Patient'],
+        ['Mariam Sultana', '1000000005', 'patient005@nhre.demo', '+8801710001005', 'Patient123!', 'Patient'],
+        ['Kabir Rahman', '1000000006', 'patient006@nhre.demo', '+8801710001006', 'Patient123!', 'Patient'],
+        ['Ayesha Karim', '1000000007', 'patient007@nhre.demo', '+8801710001007', 'Patient123!', 'Patient'],
+        ['Rafi Chowdhury', '1000000008', 'patient008@nhre.demo', '+8801710001008', 'Patient123!', 'Patient'],
+        ['Tasnim Akter', '1000000009', 'patient009@nhre.demo', '+8801710001009', 'Patient123!', 'Patient'],
+        ['Imran Hasan', '1000000010', 'patient010@nhre.demo', '+8801710001010', 'Patient123!', 'Patient'],
+        ['Nusrat Jahan', '1000000011', 'patient011@nhre.demo', '+8801710001011', 'Patient123!', 'Patient'],
+        ['Mahmud Hossain', '1000000012', 'patient012@nhre.demo', '+8801710001012', 'Patient123!', 'Patient'],
+        ['Faria Ahmed', '1000000013', 'patient013@nhre.demo', '+8801710001013', 'Patient123!', 'Patient'],
+        ['Tahmid Islam', '1000000014', 'patient014@nhre.demo', '+8801710001014', 'Patient123!', 'Patient'],
+        ['Sadia Rahman', '1000000015', 'patient015@nhre.demo', '+8801710001015', 'Patient123!', 'Patient'],
+        ['Nabil Karim', '1000000016', 'patient016@nhre.demo', '+8801710001016', 'Patient123!', 'Patient'],
+        ['Lamia Hossain', '1000000017', 'patient017@nhre.demo', '+8801710001017', 'Patient123!', 'Patient'],
+        ['Asif Mahmood', '1000000018', 'patient018@nhre.demo', '+8801710001018', 'Patient123!', 'Patient'],
+        ['Mehnaz Chowdhury', '1000000019', 'patient019@nhre.demo', '+8801710001019', 'Patient123!', 'Patient'],
+        ['Rakib Ahmed', '1000000020', 'patient020@nhre.demo', '+8801710001020', 'Patient123!', 'Patient'],
+        ['Jannat Sultana', '1000000021', 'patient021@nhre.demo', '+8801710001021', 'Patient123!', 'Patient'],
+        ['Ahsan Talukder', '1000000022', 'patient022@nhre.demo', '+8801710001022', 'Patient123!', 'Patient'],
+        ['Farzana Begum', '1000000023', 'patient023@nhre.demo', '+8801710001023', 'Patient123!', 'Patient'],
+        ['Maruf Islam', '1000000024', 'patient024@nhre.demo', '+8801710001024', 'Patient123!', 'Patient'],
+        ['Zarin Noor', '1000000025', 'patient025@nhre.demo', '+8801710001025', 'Patient123!', 'Patient'],
         ['Dr. Mohammad Ashraf Karim', '0000000002', 'admin@nhre.gov', '+8801710002002', 'Admin123!', 'Hospital Admin'],
         ['Nusrat Jahan Chowdhury',   '0000000003', 'sysadmin@nhre.gov', '+8801710002003', 'SysAdmin123!', 'System Admin'],
         ['Ahsanul Haque',            '0000000004', 'pharmacist@nhre.gov', '+8801710002004', 'Pharmacist123!', 'Pharmacist'],
@@ -1785,6 +2323,23 @@ function access_record_types(): array
     return ['Medical History', 'Lab Reports', 'Prescriptions', 'Vaccinations', 'Allergies', 'Medical Documents'];
 }
 
+function access_record_type_list(?array $access): array
+{
+    if ($access === null) {
+        return [];
+    }
+
+    return array_values(array_filter(
+        array_map('trim', explode(',', (string)($access['record_types'] ?? ''))),
+        static fn (string $type): bool => $type !== ''
+    ));
+}
+
+function access_allows_record_type(?array $access, string $record_type): bool
+{
+    return in_array($record_type, access_record_type_list($access), true);
+}
+
 /**
  * Return the active access permission for a patient/provider pair, or null.
  * @return array{id:int,record_types:string,expires_at:string}|null
@@ -1803,6 +2358,41 @@ function active_access(int $patient_id, int $provider_id): ?array
     } catch (PDOException $e) {
         return null;
     }
+}
+
+/**
+ * Return an active permission only when it includes the requested record type.
+ * @return array{id:int,record_types:string,expires_at:string}|null
+ */
+function active_access_for_record_type(int $patient_id, int $provider_id, string $record_type): ?array
+{
+    $access = active_access($patient_id, $provider_id);
+    return access_allows_record_type($access, $record_type) ? $access : null;
+}
+
+function user_hospital_id(int $user_id): ?int
+{
+    if ($user_id <= 0) {
+        return null;
+    }
+
+    try {
+        $stmt = db()->prepare('SELECT hospital_id FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([$user_id]);
+        $value = $stmt->fetchColumn();
+        return $value !== false && $value !== null ? (int)$value : null;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+function hospital_admin_can_manage_user(int $admin_id, int $managed_user_id): bool
+{
+    $admin_hospital_id = user_hospital_id($admin_id);
+    $managed_hospital_id = user_hospital_id($managed_user_id);
+    return $admin_hospital_id !== null
+        && $admin_hospital_id > 0
+        && $managed_hospital_id === $admin_hospital_id;
 }
 
 /** Record a provider's read access in the audit log and notify the patient. */
