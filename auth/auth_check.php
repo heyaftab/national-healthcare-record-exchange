@@ -263,6 +263,33 @@ function create_notification(int $user_id, string $title, string $message, strin
     }
 }
 
+function notify_center_lab_technicians(int $center_id, string $title, string $message, string $type, ?string $section = null): void
+{
+    if ($center_id <= 0) {
+        return;
+    }
+
+    try {
+        $sql = 'SELECT DISTINCT lta.technician_id
+                FROM lab_technician_assignments lta
+                JOIN users u ON u.id = lta.technician_id AND u.role = \'Lab Technician\'
+                WHERE lta.center_id = ?';
+        $params = [$center_id];
+        if ($section !== null && $section !== '') {
+            $sql .= ' AND (lta.section_name IS NULL OR lta.section_name = ?)';
+            $params[] = $section;
+        } else {
+            $sql .= ' AND lta.section_name IS NULL';
+        }
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $technician_id) {
+            create_notification((int)$technician_id, $title, $message, $type);
+        }
+    } catch (PDOException $e) {
+    }
+}
+
 /** Create the clinical tables used by records/document pages without replacing existing data. */
 function ensure_clinical_tables(): void
 {
@@ -704,6 +731,7 @@ function ensure_demo_accounts(): void
         ['System Administrator',   '0000000003', 'sysadmin@nhre.gov', '+8801000000003', 'SysAdmin123!', 'System Admin'],
         ['Demo Pharmacist',        '0000000004', 'pharmacist@nhre.gov', '+8801000000004', 'Pharmacist123!', 'Pharmacist'],
         ['Demo Lab Technician',    '0000000005', 'lab@nhre.gov', '+8801000000005', 'Lab123!', 'Lab Technician'],
+        ['Nusrat Jahan',           '0000000006', 'nusrat.jahan.lab@nhre.gov', '+8801712345606', 'LabTech123!', 'Lab Technician'],
     ];
 
     try {
@@ -904,6 +932,13 @@ function ensure_medical_test_tables_exists(): void
 
     try {
         db()->exec('UPDATE medical_tests mt JOIN vaccination_centers vc ON vc.district = mt.place SET mt.center_id = vc.id WHERE mt.center_id IS NULL');
+        $sharedCenter = db()->prepare("SELECT id FROM vaccination_centers WHERE name = 'Green Crescent Diagnostic & Vaccination Centre' LIMIT 1");
+        $sharedCenter->execute();
+        $sharedCenterId = (int)$sharedCenter->fetchColumn();
+        if ($sharedCenterId > 0) {
+            $mapServices = db()->prepare('UPDATE medical_tests SET center_id = ?, place = ? WHERE name IN (?, ?, ?)');
+            $mapServices->execute([$sharedCenterId, 'Mirpur, Dhaka', 'Blood Sugar Test', 'CBC Test', 'Lipid Profile']);
+        }
         $patientId = (int)db()->query("SELECT id FROM users WHERE email = 'patient@nhre.gov' AND role = 'Patient' LIMIT 1")->fetchColumn();
         if ($patientId > 0) {
             $seedBooking = db()->prepare('INSERT INTO medical_test_bookings (test_id, user_id, booking_date, booking_time, status, result_notes, created_at, updated_at) SELECT id, ?, ?, ?, ?, ?, NOW(), NOW() FROM medical_tests WHERE center_id IS NOT NULL ORDER BY id LIMIT 1');
@@ -1019,6 +1054,7 @@ function ensure_vaccination_center_tables(): void
     );
 
     $centers = [
+        ['Green Crescent Diagnostic & Vaccination Centre', 'Dhaka', 'Dhaka', 'Private', 'Mirpur 10, Dhaka', '+880-2-55012345'],
         ['ICDC Hospital EPI Centre', 'Dhaka', 'Dhaka', 'Public', 'Matuail, Demra', '+880-2-7561811'],
         ['Shaheed Suhrawardy Medical College Hospital', 'Dhaka', 'Dhaka', 'Public', 'Sher-e-Bangla Nagar', '+880-2-8121686'],
         ['Chattogram Medical College Hospital EPI Unit', 'Chattogram', 'Chattogram', 'Public', 'K.B. Fazlul Kader Road', '+880-31-632337'],
@@ -1136,6 +1172,17 @@ function ensure_vaccination_center_tables(): void
         }
     }
 
+    $newTechnicianStmt = db()->prepare("SELECT id FROM users WHERE email = 'nusrat.jahan.lab@nhre.gov' AND role = 'Lab Technician' LIMIT 1");
+    $newTechnicianStmt->execute();
+    $newTechnicianId = (int)$newTechnicianStmt->fetchColumn();
+    $sharedCenterStmt = db()->prepare("SELECT id FROM vaccination_centers WHERE name = 'Green Crescent Diagnostic & Vaccination Centre' LIMIT 1");
+    $sharedCenterStmt->execute();
+    $sharedCenterId = (int)$sharedCenterStmt->fetchColumn();
+    if ($newTechnicianId > 0 && $sharedCenterId > 0) {
+        $assignment = db()->prepare('INSERT IGNORE INTO lab_technician_assignments (technician_id, center_id, section_name) VALUES (?, ?, NULL)');
+        $assignment->execute([$newTechnicianId, $sharedCenterId]);
+    }
+
     db()->exec(
         'CREATE TABLE IF NOT EXISTS `lab_technician_assignments` (
           `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1164,9 +1211,15 @@ function ensure_vaccination_center_tables(): void
                  WHERE NOT EXISTS (
                    SELECT 1 FROM lab_technician_assignments lta
                    WHERE lta.technician_id = ? AND lta.center_id = vc.id AND lta.section_name IS NULL
-                 )'
+                 ) AND vc.name <> \'Green Crescent Diagnostic & Vaccination Centre\''
             );
             $assignment->execute([$techId, $techId]);
+              $removeSharedCenterAssignment = db()->prepare(
+                 'DELETE lta FROM lab_technician_assignments lta
+                  JOIN vaccination_centers vc ON vc.id = lta.center_id
+                  WHERE lta.technician_id = ? AND vc.name = ? AND lta.section_name IS NULL'
+              );
+              $removeSharedCenterAssignment->execute([$techId, 'Green Crescent Diagnostic & Vaccination Centre']);
         }
         $patientId = (int)db()->query("SELECT id FROM users WHERE email = 'patient@nhre.gov' AND role = 'Patient' LIMIT 1")->fetchColumn();
         if ($patientId > 0) {

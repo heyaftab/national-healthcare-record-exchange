@@ -81,6 +81,7 @@ if ($action === 'book_vaccination') {
         );
         $stmt->execute([$userId, $vaccineName, $doseNumber, $centerId > 0 ? $centerId : null, $bookingDate, $bookingTime !== '' ? $bookingTime : null, $contactPhone, $notes !== '' ? $notes : null]);
         create_notification($userId, 'Vaccination booking received', 'Your ' . $vaccineName . ' vaccination booking request is awaiting review.', 'vaccination');
+        notify_center_lab_technicians($centerId, 'New vaccination booking', 'A patient booked ' . $vaccineName . ' vaccination, dose ' . $doseNumber . '. Review the request in your vaccination bookings.', 'vaccination');
         $_SESSION['success'] = 'Your vaccination booking request has been submitted.';
     } catch (PDOException $e) {
         $_SESSION['errors'] = ['Unable to save your vaccination booking. Please try again later.'];

@@ -15,6 +15,7 @@ $demo_accounts = [
     ['role' => 'Doctor', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor001!', 'badge' => 'info', 'seed' => 'demo-doctor-001', 'email_note' => '(001–100)'],
     ['role' => 'Pharmacist', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
     ['role' => 'Lab Technician', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
+    ['role' => 'Lab Technician', 'email' => 'nusrat.jahan.lab@nhre.gov', 'password' => 'LabTech123!', 'badge' => 'warning', 'seed' => 'nusrat-jahan-lab'],
     ['role' => 'Hospital Admin', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
     ['role' => 'System Admin', 'email' => 'sysadmin@nhre.gov', 'password' => 'SysAdmin123!', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
 ];
@@ -166,10 +167,10 @@ function demo_profile_picture(array $account, array $photos): string
       <div class="row g-4 justify-content-center">
         <div class="col-lg-10">
           <div class="demo-accounts glass-card">
-            <div class="demo-accounts-head">
-              <span class="auth-kicker">Demo access</span>
-              <h3>Demo accounts</h3>
-              <p>Pick any seeded account below and click <strong>Use</strong> to fill the login form.</p>
+              <div class="demo-accounts-head">
+              <span class="auth-kicker">Account access</span>
+              <h3>Available accounts</h3>
+              <p>Select an account and click <strong>Use</strong> to fill the login form.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-sm table-hover align-middle mb-0">
@@ -185,10 +186,10 @@ function demo_profile_picture(array $account, array $photos): string
                 </thead>
                 <tbody id="moreDoctorAccounts">
                   <?php foreach ($demo_accounts as $account): ?>
-                    <tr>
-                      <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> demo account"></td>
+                    <tr class="<?= $account['email'] === 'nusrat.jahan.lab@nhre.gov' ? 'more-lab-account d-none' : '' ?>">
+                      <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> account"></td>
                       <td><span class="badge bg-<?= e($account['badge']) ?>-subtle text-<?= e($account['badge']) ?>-emphasis"><?= e($account['role']) ?></span></td>
-                      <td class="font-monospace"><?= e($account['email']) ?><?php if (!empty($account['email_note'])): ?> <span class="text-muted"><?= e($account['email_note']) ?></span><?php endif; ?><?php if ($account['role'] === 'Doctor'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleDoctorAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php elseif ($account['role'] === 'Patient'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="togglePatientAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php endif; ?></td>
+                      <td class="font-monospace"><?= e($account['email']) ?><?php if (!empty($account['email_note'])): ?> <span class="text-muted"><?= e($account['email_note']) ?></span><?php endif; ?><?php if ($account['role'] === 'Doctor'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleDoctorAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php elseif ($account['role'] === 'Patient'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="togglePatientAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php elseif ($account['email'] === 'lab@nhre.gov'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleLabAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php endif; ?></td>
                       <td class="font-monospace"><?= e($account['account_number'] ?? '—') ?></td>
                       <td class="font-monospace"><?= e($account['password']) ?></td>
                       <td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm" data-email="<?= e($account['email']) ?>" data-password="<?= e($account['password']) ?>">Use</button></td>
@@ -219,7 +220,7 @@ function demo_profile_picture(array $account, array $photos): string
         password.dispatchEvent(new Event('input', { bubbles: true }));
         document.querySelector('#loginForm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         email.focus();
-        window.nhreToast && nhreToast('Demo credentials filled — you\u2019re ready to log in.');
+        window.nhreToast && nhreToast('Account credentials filled — you\u2019re ready to log in.');
       });
     });
     var doctorAccountsLoaded = false;
@@ -284,6 +285,12 @@ function demo_profile_picture(array $account, array $photos): string
       }
       document.querySelectorAll('.more-patient-account').forEach(function (row) { row.classList.toggle('d-none', expanded); });
       this.setAttribute('aria-expanded', String(!expanded)); this.textContent = expanded ? 'More' : 'Hide';
+    });
+    document.getElementById('toggleLabAccounts')?.addEventListener('click', function () {
+      var expanded = this.getAttribute('aria-expanded') === 'true';
+      document.querySelectorAll('.more-lab-account').forEach(function (row) { row.classList.toggle('d-none', expanded); });
+      this.setAttribute('aria-expanded', String(!expanded));
+      this.textContent = expanded ? 'More' : 'Hide';
     });
   </script>
 </body>

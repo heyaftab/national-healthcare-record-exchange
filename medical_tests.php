@@ -83,7 +83,7 @@ if ($home_collection !== '') {
     $params[] = ($home_collection === 'yes') ? 1 : 0;
 }
 
-$sql = 'SELECT id, name, description, test_type, price, place, department, result_time, availability, home_collection FROM medical_tests';
+$sql = 'SELECT mt.id, mt.name, mt.description, mt.test_type, mt.price, mt.place, mt.department, mt.result_time, mt.availability, mt.home_collection, vc.name AS center_name FROM medical_tests mt LEFT JOIN vaccination_centers vc ON vc.id = mt.center_id';
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
@@ -293,7 +293,7 @@ if ($technician_view) {
                     </div>
                     <div class="test-meta-row">
                       <span class="test-chip"><i class="fa-solid fa-tag"></i><?= e($test['test_type']) ?></span>
-                      <span class="test-chip"><i class="fa-solid fa-location-dot"></i><?= e($test['place']) ?></span>
+                      <span class="test-chip"><i class="fa-solid fa-location-dot"></i><?= e($test['center_name'] ?: $test['place']) ?></span>
                       <span class="test-chip"><i class="fa-solid fa-clock"></i><?= e($test['result_time']) ?></span>
                     </div>
                     <div class="test-meta-row">
