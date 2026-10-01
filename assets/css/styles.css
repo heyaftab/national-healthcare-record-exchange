@@ -1526,7 +1526,8 @@ html[data-theme="dark"] .cta-banner {
     radial-gradient(900px 600px at -10% 110%, rgba(232, 163, 61, 0.16), transparent 55%),
     linear-gradient(160deg, var(--navy) 0%, var(--slate) 100%);
   color: #fff;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .auth-body::before,

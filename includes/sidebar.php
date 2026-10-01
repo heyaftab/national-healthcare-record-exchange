@@ -80,7 +80,6 @@ if ($sidebarRole === 'Patient') {
     ]);
 } elseif ($sidebarRole === 'System Admin') {
     $sidebarLinks = array_merge($sidebarLinks, [
-        ['admin_dashboard.php', 'fa-house', 'Dashboard'],
         ['admin_operations.php?view=user-management', 'fa-users-gear', 'Users'],
         ['admin_operations.php?view=organizations', 'fa-building', 'Organizations'],
         ['admin_operations.php?view=roles-permissions', 'fa-user-shield', 'Roles & Permissions'],
@@ -88,7 +87,6 @@ if ($sidebarRole === 'Patient') {
         ['admin_operations.php?view=audit-logs', 'fa-clipboard-list', 'Audit Logs'],
         ['admin_operations.php?view=data-exchange', 'fa-network-wired', 'Data Exchange'],
         ['admin_operations.php?view=reports', 'fa-chart-column', 'Reports'],
-        ['admin_operations.php?view=settings', 'fa-sliders', 'Settings'],
     ]);
 }
 
