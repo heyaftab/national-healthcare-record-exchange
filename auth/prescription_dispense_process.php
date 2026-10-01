@@ -110,7 +110,7 @@ try {
         }
 
         if ($need > 1e-9) {
-            $available = $need - array_sum(array_column($drawn, 'qty'));
+            $available = (float)available_stock((int)$item['medicine_id']);
             $pdo->rollBack();
             $_SESSION['errors'] = [
                 'Insufficient non-expired stock for "' . $item['medicine_name'] . '". '
@@ -175,6 +175,10 @@ try {
     $updateRx->execute([$new_status, (int)$_SESSION['user_id'], $rx_id]);
 
     $pdo->commit();
+    foreach ($items as $item) {
+        $medicineId = (int)$item['medicine_id'];
+        pharmacist_stock_alerts($medicineId);
+    }
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

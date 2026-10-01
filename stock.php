@@ -131,6 +131,12 @@ foreach ($medicines as $medicine) {
         </div>
       <?php endif; ?>
 
+      <div class="d-flex flex-wrap gap-2 mt-4">
+        <a class="btn btn-outline-primary" href="stock_out.php"><i class="fa-solid fa-minus-circle"></i> Stock Out</a>
+        <a class="btn btn-outline-primary" href="stock_adjustment.php"><i class="fa-solid fa-sliders"></i> Stock Adjustment</a>
+        <a class="btn btn-outline-primary" href="activity_log.php"><i class="fa-solid fa-clipboard-list"></i> Audit Log</a>
+      </div>
+
       <div class="row g-4 mt-1">
         <div class="col-lg-5">
           <article class="dashboard-card">

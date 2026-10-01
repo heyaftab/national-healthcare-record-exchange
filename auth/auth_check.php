@@ -242,6 +242,7 @@ function notification_destination(string $type, string $role): string
         'vaccination' => in_array($role, ['Patient', 'Lab Technician'], true) ? 'vaccination.php' : 'dashboard.php',
         'pharmacy' => in_array($role, ['Patient', 'Pharmacist'], true) ? 'pharmacy.php' : 'dashboard.php',
         'prescription' => in_array($role, ['Patient', 'Doctor', 'Pharmacist'], true) ? 'prescriptions.php' : 'dashboard.php',
+        'stock' => $role === 'Pharmacist' ? 'stock.php' : 'dashboard.php',
         'access' => $role === 'Patient' ? 'data_access.php' : ($role === 'Doctor' ? 'access_requests.php' : 'dashboard.php'),
         default => 'dashboard.php',
     };
@@ -295,9 +296,9 @@ function ensure_clinical_tables(): void
 
 function create_event_notification(PDO $pdo, int $userId, string $title, string $message, string $type, string $eventKey, string $url): void
 {
-    $stmt = $pdo->prepare('INSERT INTO notifications (user_id, title, message, notification_type, related_url, event_key) VALUES (?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE title = VALUES(title), message = VALUES(message), created_at = CURRENT_TIMESTAMP, is_read = 0, related_url = VALUES(related_url)');
-    $stmt->execute([$userId, $title, $message, $type, $url, $eventKey]);
+    $stmt = $pdo->prepare('INSERT INTO notifications (user_id, title, message, notification_type, target_path, related_url, event_key) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE title = VALUES(title), message = VALUES(message), created_at = CURRENT_TIMESTAMP, is_read = 0, target_path = VALUES(target_path), related_url = VALUES(related_url)');
+    $stmt->execute([$userId, $title, $message, $type, $url, $url, $eventKey]);
 }
 
 function ensure_appointments_table_exists(): void
