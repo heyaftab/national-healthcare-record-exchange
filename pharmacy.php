@@ -13,6 +13,7 @@ $role = $_SESSION['role'] ?? 'User';
 $errors = session_pull('errors', []);
 $old = session_pull('old', []);
 $success = session_pull('success');
+$pharmacyQuery = trim((string)($_GET['pharmacy_query'] ?? ''));
 
 if ($role === 'Pharmacist') {
     try {
@@ -34,17 +35,45 @@ if ($role === 'Pharmacist') {
             'SELECT id, name, unit, reorder_level FROM medicines WHERE is_active = 1 ORDER BY name ASC'
         )->fetchAll();
         $lowStock = [];
+        $medicineLookup = [];
         foreach ($medicines as $medicine) {
             $summary = medicine_stock_summary((int)$medicine['id']);
+            $medicine['available'] = $summary['available'];
+            $medicine['expiring'] = $summary['expiring'];
+            $medicine['total'] = $summary['total'];
+            $medicineLookup[] = $medicine;
             if ($summary['available'] < (int)$medicine['reorder_level']) {
-                $medicine['available'] = $summary['available'];
                 $lowStock[] = $medicine;
             }
         }
+
+        $pharmacyResults = [];
+        if ($pharmacyQuery !== '') {
+            foreach ($medicineLookup as $medicine) {
+                $name = strtolower((string)$medicine['name']);
+                if (stripos((string)$medicine['name'], $pharmacyQuery) === false && stripos($name, strtolower($pharmacyQuery)) === false) {
+                    continue;
+                }
+                $pharmacyResults[] = $medicine;
+            }
+        } else {
+            $pharmacyResults = array_slice($medicineLookup, 0, 6);
+        }
+
+        $nearExpiry = [];
+        foreach ($medicineLookup as $medicine) {
+            if ((int)$medicine['expiring'] > 0) {
+                $nearExpiry[] = $medicine;
+            }
+        }
+        usort($nearExpiry, static fn($a, $b) => (int)$b['expiring'] <=> (int)$a['expiring']);
+        $nearExpiry = array_slice($nearExpiry, 0, 5);
     } catch (PDOException $e) {
         $stats = [];
         $recent = [];
         $lowStock = [];
+        $pharmacyResults = [];
+        $nearExpiry = [];
     }
 } else {
     $recent_requests = [];
@@ -181,6 +210,69 @@ if ($role === 'Pharmacist') {
         </div>
 
         <div class="row g-4 mt-1">
+          <div class="col-12">
+            <article class="dashboard-card">
+              <div class="dashboard-card-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+              <h2>Medicine quick search</h2>
+              <form method="GET" action="pharmacy.php" class="mt-3">
+                <div class="input-group">
+                  <input type="text" class="form-control" name="pharmacy_query" value="<?= e($pharmacyQuery) ?>" placeholder="Search medicine by name or part of the name">
+                  <button class="btn btn-solid-nhre" type="submit"><i class="fa-solid fa-search"></i> Search</button>
+                </div>
+              </form>
+
+              <?php if ($pharmacyResults): ?>
+                <div class="table-responsive mt-3">
+                  <table class="table table-hover align-middle">
+                    <thead>
+                      <tr>
+                        <th>Medicine</th>
+                        <th>Available</th>
+                        <th>Reorder</th>
+                        <th>Expiring soon</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($pharmacyResults as $medicine): ?>
+                        <tr>
+                          <td><?= e((string)$medicine['name']) ?></td>
+                          <td><?= (int)$medicine['available'] ?></td>
+                          <td><?= (int)$medicine['reorder_level'] ?></td>
+                          <td><?= (int)$medicine['expiring'] ?></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+              <?php else: ?>
+                <p class="text-muted mt-3 mb-0">No medicines matched the current search.</p>
+              <?php endif; ?>
+            </article>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-lg-5">
+            <article class="dashboard-card">
+              <div class="dashboard-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+              <h2>Near-expiry medicines</h2>
+              <?php if ($nearExpiry): ?>
+                <div class="list-group list-group-flush mt-3">
+                  <?php foreach ($nearExpiry as $medicine): ?>
+                    <div class="list-group-item px-0">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <strong><?= e((string)$medicine['name']) ?></strong>
+                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis"><?= (int)$medicine['expiring'] ?> units</span>
+                      </div>
+                      <small class="text-muted">Available: <?= (int)$medicine['available'] ?> • Reorder: <?= (int)$medicine['reorder_level'] ?></small>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php else: ?>
+                <p class="text-muted mt-3 mb-0">No medicines are approaching expiry.</p>
+              <?php endif; ?>
+            </article>
+          </div>
           <div class="col-lg-7">
             <article class="dashboard-card">
               <div class="dashboard-card-icon"><i class="fa-solid fa-prescription"></i></div>
@@ -202,7 +294,10 @@ if ($role === 'Pharmacist') {
               <?php endif; ?>
             </article>
           </div>
-          <div class="col-lg-5">
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-12">
             <article class="dashboard-card">
               <div class="dashboard-card-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
               <h2>Inventory shortcuts</h2>

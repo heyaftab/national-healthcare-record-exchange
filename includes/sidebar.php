@@ -59,8 +59,12 @@ if ($sidebarRole === 'Patient') {
         ['prescriptions.php', 'fa-prescription', 'Prescriptions'],
         ['inventory.php', 'fa-boxes-stacked', 'Medicine Inventory'],
         ['stock.php', 'fa-boxes-packing', 'Stock Management'],
+        ['stock_out.php', 'fa-minus-circle', 'Stock Out'],
+        ['stock_adjustment.php', 'fa-sliders', 'Stock Adjustment'],
+        ['activity_log.php', 'fa-clipboard-list', 'Audit Log'],
         ['patient_search.php', 'fa-magnifying-glass', 'Patient Search'],
         ['dispensing_history.php', 'fa-clock-rotate-left', 'Dispensing History'],
+        ['reports.php', 'fa-chart-column', 'Reports'],
     ]);
 } elseif ($sidebarRole === 'Hospital Admin') {
     $sidebarLinks = array_merge($sidebarLinks, [

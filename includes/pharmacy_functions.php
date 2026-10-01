@@ -159,6 +159,208 @@ function ensure_pharmacy_tables(): void
     );
 
     pharmacy_seed_catalog();
+    ensure_demo_pharmacist_data();
+}
+
+function ensure_demo_pharmacist_data(): void
+{
+    try {
+        $pdo = db();
+
+        $patientId = (int)$pdo->query("SELECT id FROM users WHERE email = 'patient@nhre.gov' LIMIT 1")->fetchColumn();
+        $doctorId = (int)$pdo->query("SELECT id FROM users WHERE email = 'doctor001@nhre.dev' LIMIT 1")->fetchColumn();
+        $pharmacistId = (int)$pdo->query("SELECT id FROM users WHERE role = 'Pharmacist' ORDER BY id ASC LIMIT 1")->fetchColumn();
+        if ($patientId <= 0 || $doctorId <= 0 || $pharmacistId <= 0) {
+            return;
+        }
+
+        $medicines = $pdo->query("SELECT id, name FROM medicines WHERE name IN ('Paracetamol 500mg', 'Amoxicillin 500mg', 'Metformin 500mg', 'Amlodipine 5mg', 'Cetirizine 10mg') ORDER BY id ASC")->fetchAll();
+        $medicineMap = [];
+        foreach ($medicines as $medicine) {
+            $medicineMap[(string)$medicine['name']] = (int)$medicine['id'];
+        }
+        if ($medicineMap === []) {
+            return;
+        }
+
+        $batchInsert = $pdo->prepare(
+            'INSERT INTO medicine_batches (medicine_id, batch_no, expiry_date, quantity_remaining, hospital_id, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE quantity_remaining = quantity_remaining'
+        );
+        $batchInsert->execute([$medicineMap['Paracetamol 500mg'], 'PAR-DEMO-2401', date('Y-m-d', strtotime('+180 days')), 180, null, $pharmacistId]);
+        $batchInsert->execute([$medicineMap['Amoxicillin 500mg'], 'AMX-DEMO-2309', date('Y-m-d', strtotime('+120 days')), 95, null, $pharmacistId]);
+        $batchInsert->execute([$medicineMap['Metformin 500mg'], 'MET-DEMO-2407', date('Y-m-d', strtotime('+210 days')), 140, null, $pharmacistId]);
+
+        $rxInsert = $pdo->prepare(
+            'INSERT INTO prescriptions (prescription_no, patient_id, doctor_id, status, notes, verified_by, verified_at, expires_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY))
+             ON DUPLICATE KEY UPDATE status = VALUES(status)'
+        );
+        $rxInsert->execute([
+            'RX-DEMO-001',
+            $patientId,
+            $doctorId,
+            'VERIFIED',
+            'Demo prescription for pharmacist preview and dispensing testing.',
+            $doctorId,
+        ]);
+        $prescriptionId = (int)$pdo->query("SELECT id FROM prescriptions WHERE prescription_no = 'RX-DEMO-001' LIMIT 1")->fetchColumn();
+
+        $existingItemCount = (int)$pdo->query("SELECT COUNT(*) FROM prescription_items WHERE prescription_id = {$prescriptionId}")->fetchColumn();
+        if ($existingItemCount === 0) {
+            $itemInsert = $pdo->prepare(
+                'INSERT INTO prescription_items (prescription_id, medicine_id, quantity_prescribed, dosage, frequency, duration_days, instructions)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $itemInsert->execute([$prescriptionId, $medicineMap['Paracetamol 500mg'], 30, '500mg', '1 tablet twice daily', 15, 'Take after meals as needed.']);
+            $itemInsert->execute([$prescriptionId, $medicineMap['Amoxicillin 500mg'], 20, '500mg', '1 capsule twice daily', 10, 'Complete the course.']);
+        }
+
+        $batchLookup = $pdo->prepare('SELECT id FROM medicine_batches WHERE medicine_id = ? ORDER BY expiry_date ASC, id ASC LIMIT 1');
+        $batchLookup->execute([$medicineMap['Paracetamol 500mg']]);
+        $paracetamolBatchId = (int)$batchLookup->fetchColumn();
+        $batchLookup->execute([$medicineMap['Amoxicillin 500mg']]);
+        $amoxBatchId = (int)$batchLookup->fetchColumn();
+
+        $demoDispenseCount = (int)$pdo->query("SELECT COUNT(*) FROM dispensings WHERE dispensing_no IN ('DSP-DEMO-001', 'DSP-DEMO-002')")->fetchColumn();
+        if ($demoDispenseCount === 0) {
+            $dispensingInsert = $pdo->prepare(
+                'INSERT INTO dispensings (dispensing_no, prescription_id, patient_id, pharmacist_id, status, notes)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $dispensingInsert->execute(['DSP-DEMO-001', $prescriptionId, $patientId, $pharmacistId, 'COMPLETED', 'Demo dispensing record for pharmacist preview.']);
+            $dispensingId = (int)$pdo->lastInsertId();
+
+            $dispenseItemInsert = $pdo->prepare(
+                'INSERT INTO dispensing_items (dispensing_id, prescription_item_id, medicine_id, batch_id, quantity_given)
+                 VALUES (?, ?, ?, ?, ?)'
+            );
+            $itemRows = $pdo->query("SELECT id, medicine_id FROM prescription_items WHERE prescription_id = {$prescriptionId}")->fetchAll();
+            foreach ($itemRows as $item) {
+                $batchId = ((int)$item['medicine_id'] === $medicineMap['Paracetamol 500mg']) ? $paracetamolBatchId : $amoxBatchId;
+                $quantity = ((int)$item['medicine_id'] === $medicineMap['Paracetamol 500mg']) ? 14 : 10;
+                $dispenseItemInsert->execute([$dispensingId, (int)$item['id'], (int)$item['medicine_id'], $batchId, $quantity]);
+                $pdo->prepare('UPDATE medicine_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')->execute([$quantity, $batchId]);
+            }
+
+            $secondRx = $pdo->prepare(
+                'INSERT INTO prescriptions (prescription_no, patient_id, doctor_id, status, notes, verified_by, verified_at, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 75 DAY))'
+            );
+            $secondRx->execute([
+                'RX-DEMO-002',
+                $patientId,
+                $doctorId,
+                'READY',
+                'Second demo prescription for continued pharmacist dashboard preview.',
+                $doctorId,
+            ]);
+            $secondPrescriptionId = (int)$pdo->lastInsertId();
+
+            $secondItem = $pdo->prepare(
+                'INSERT INTO prescription_items (prescription_id, medicine_id, quantity_prescribed, dosage, frequency, duration_days, instructions)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $secondItem->execute([$secondPrescriptionId, $medicineMap['Metformin 500mg'], 30, '500mg', '1 tablet daily', 30, 'Continue with meals and monitor blood sugar.']);
+
+            $secondDispensingInsert = $pdo->prepare(
+                'INSERT INTO dispensings (dispensing_no, prescription_id, patient_id, pharmacist_id, status, notes)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $secondDispensingInsert->execute(['DSP-DEMO-002', $secondPrescriptionId, $patientId, $pharmacistId, 'COMPLETED', 'Second demo dispensing record for the pharmacist timeline.']);
+            $secondDispensingId = (int)$pdo->lastInsertId();
+            $secondItemLookup = $pdo->query("SELECT id, medicine_id FROM prescription_items WHERE prescription_id = {$secondPrescriptionId} LIMIT 1")->fetch();
+            if ($secondItemLookup) {
+                $metforminBatchId = (int)$pdo->query("SELECT id FROM medicine_batches WHERE medicine_id = {$medicineMap['Metformin 500mg']} ORDER BY expiry_date ASC, id ASC LIMIT 1")->fetchColumn();
+                $pdo->prepare('INSERT INTO dispensing_items (dispensing_id, prescription_item_id, medicine_id, batch_id, quantity_given) VALUES (?, ?, ?, ?, ?)')->execute([$secondDispensingId, (int)$secondItemLookup['id'], (int)$secondItemLookup['medicine_id'], $metforminBatchId, 15]);
+                $pdo->prepare('UPDATE medicine_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')->execute([15, $metforminBatchId]);
+            }
+        }
+
+        $extraPrescriptionSeeds = [
+            [
+                'RX-DEMO-003',
+                'VERIFIED',
+                'Follow-up prescription for blood pressure management and monitoring.',
+                [
+                    ['Amlodipine 5mg', 30, '5mg', '1 tablet daily', 30, 'Take in the morning with water.'],
+                    ['Metformin 500mg', 60, '500mg', '1 tablet twice daily', 30, 'Take after meals to improve tolerance.']
+                ]
+            ],
+            [
+                'RX-DEMO-004',
+                'READY',
+                'Seasonal allergy medication refill for pharmacist review.',
+                [
+                    ['Cetirizine 10mg', 20, '10mg', '1 tablet daily', 20, 'Use daily for symptom control.'],
+                    ['Paracetamol 500mg', 12, '500mg', '1 tablet as needed', 6, 'Use only if fever or pain recurs.']
+                ]
+            ],
+        ];
+
+        foreach ($extraPrescriptionSeeds as $seed) {
+            [$rxNo, $status, $notes, $items] = $seed;
+
+            $pdo->prepare(
+                'INSERT INTO prescriptions (prescription_no, patient_id, doctor_id, status, notes, verified_by, verified_at, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY))
+                 ON DUPLICATE KEY UPDATE status = VALUES(status), notes = VALUES(notes)'
+            )->execute([$rxNo, $patientId, $doctorId, $status, $notes, $doctorId]);
+
+            $extraPrescriptionId = (int)$pdo->query("SELECT id FROM prescriptions WHERE prescription_no = '{$rxNo}' LIMIT 1")->fetchColumn();
+            if ($extraPrescriptionId > 0) {
+                $itemCheck = (int)$pdo->query("SELECT COUNT(*) FROM prescription_items WHERE prescription_id = {$extraPrescriptionId}")->fetchColumn();
+                if ($itemCheck === 0) {
+                    $extraItemInsert = $pdo->prepare(
+                        'INSERT INTO prescription_items (prescription_id, medicine_id, quantity_prescribed, dosage, frequency, duration_days, instructions)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)'
+                    );
+
+                    foreach ($items as $item) {
+                        [$medicineName, $quantity, $dosage, $frequency, $durationDays, $instructions] = $item;
+                        $medicineId = $medicineMap[$medicineName] ?? null;
+                        if ($medicineId === null) {
+                            continue;
+                        }
+
+                        $extraItemInsert->execute([$extraPrescriptionId, $medicineId, $quantity, $dosage, $frequency, $durationDays, $instructions]);
+                    }
+                }
+
+                $dispenseNo = 'DSP-DEMO-' . substr($rxNo, -3);
+                $existingDispense = (int)$pdo->query("SELECT COUNT(*) FROM dispensings WHERE dispensing_no = '{$dispenseNo}'")->fetchColumn();
+                if ($existingDispense === 0) {
+                    $extraDispensingInsert = $pdo->prepare(
+                        'INSERT INTO dispensings (dispensing_no, prescription_id, patient_id, pharmacist_id, status, notes)
+                         VALUES (?, ?, ?, ?, ?, ?)'
+                    );
+                    $extraDispensingInsert->execute([$dispenseNo, $extraPrescriptionId, $patientId, $pharmacistId, 'COMPLETED', 'Additional demo dispensing record for pharmacist preview.']);
+                    $extraDispensingId = (int)$pdo->lastInsertId();
+
+                    $itemRows = $pdo->query("SELECT id, medicine_id FROM prescription_items WHERE prescription_id = {$extraPrescriptionId}")->fetchAll();
+                    foreach ($itemRows as $row) {
+                        $medicine_id = (int)$row['medicine_id'];
+                        $batchId = (int)$pdo->query("SELECT id FROM medicine_batches WHERE medicine_id = {$medicine_id} ORDER BY expiry_date ASC, id ASC LIMIT 1")->fetchColumn();
+                        if ($batchId <= 0) {
+                            continue;
+                        }
+                        $quantityGiven = ($medicine_id === $medicineMap['Amlodipine 5mg']) ? 20 : 10;
+                        $pdo->prepare('INSERT INTO dispensing_items (dispensing_id, prescription_item_id, medicine_id, batch_id, quantity_given) VALUES (?, ?, ?, ?, ?)')->execute([$extraDispensingId, (int)$row['id'], $medicine_id, $batchId, $quantityGiven]);
+                        $pdo->prepare('UPDATE medicine_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')->execute([$quantityGiven, $batchId]);
+                    }
+                }
+            }
+        }
+
+        $pdo->prepare(
+            'INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, details, ip_address)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$pharmacistId, 'Pharmacist', 'SEED_DEMO_DATA', 'prescription', $prescriptionId, 'Inserted expanded pharmacist demo stock, prescription, and dispensing data.', '127.0.0.1']);
+
+        create_notification($pharmacistId, 'Demo pharmacy data expanded', 'Additional sample pharmacist data is now available for dashboard and workflow testing.', 'stock');
+    } catch (PDOException $e) {
+    }
 }
 
 function pharmacy_seed_catalog(): void
@@ -655,13 +857,51 @@ function medicine_stock_summary(int $medicine_id): array
     }
 }
 
-/** Send a notification to every Pharmacist account. */
-function notify_pharmacists(string $title, string $message, string $type = 'prescription'): void
+/** Send a notification to every Pharmacist account using a stable event key for deduplication. */
+function notify_pharmacists(string $title, string $message, string $type = 'prescription', ?string $eventKey = null): void
 {
     try {
         $rows = db()->query("SELECT id FROM users WHERE role = 'Pharmacist'")->fetchAll();
         foreach ($rows as $row) {
-            create_notification((int)$row['id'], $title, $message, $type);
+            $userId = (int)$row['id'];
+            if ($eventKey !== null && $eventKey !== '') {
+                create_event_notification(db(), $userId, $title, $message, $type, $eventKey, 'stock.php');
+                continue;
+            }
+            create_notification($userId, $title, $message, $type);
+        }
+    } catch (PDOException $e) {
+    }
+}
+
+/** Trigger pharmacist-facing stock and expiry notices when a medicine enters a risk state. */
+function pharmacist_stock_alerts(int $medicine_id): void
+{
+    try {
+        $stmt = db()->prepare('SELECT name, reorder_level FROM medicines WHERE id = ? LIMIT 1');
+        $stmt->execute([$medicine_id]);
+        $medicine = $stmt->fetch();
+        if (!$medicine) {
+            return;
+        }
+
+        $summary = medicine_stock_summary($medicine_id);
+        $name = (string)$medicine['name'];
+        $reorder = (int)$medicine['reorder_level'];
+        $available = (int)$summary['available'];
+        $expiring = (int)$summary['expiring'];
+
+        if ($available <= 0) {
+            notify_pharmacists('Medicine out of stock', 'Medicine "' . $name . '" is now out of stock and needs restocking.', 'stock', 'stock-out:' . $medicine_id);
+            return;
+        }
+
+        if ($available < $reorder) {
+            notify_pharmacists('Low stock alert', 'Medicine "' . $name . '" is below its reorder level (' . $available . ' remaining).', 'stock', 'stock-low:' . $medicine_id);
+        }
+
+        if ($expiring > 0) {
+            notify_pharmacists('Expiring medicine', 'Medicine "' . $name . '" has stock expiring within 60 days and should be reviewed.', 'stock', 'stock-expiring:' . $medicine_id);
         }
     } catch (PDOException $e) {
     }
