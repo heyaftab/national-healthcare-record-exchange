@@ -30,6 +30,8 @@ try {
     $errors[] = 'Vaccination booking services are temporarily unavailable.';
 }
 $centerDirectory = array_map(static fn(array $center): array => ['id' => (int)$center['id'], 'name' => $center['name'], 'district' => $center['district'], 'division' => $center['division'] ?? ''], $centers);
+$sharedCenter = current(array_filter($centerDirectory, static fn(array $center): bool => $center['name'] === 'Green Crescent Diagnostic & Vaccination Centre'));
+$sharedCenterId = $sharedCenter ? (int)$sharedCenter['id'] : 0;
 $divisions = array_values(array_unique(array_filter(array_column($centerDirectory, 'division'))));
 sort($divisions);
 
@@ -139,7 +141,7 @@ try {
 
       <?php if ($role !== 'Lab Technician'): ?>
       <div class="row g-4">
-        <?php foreach ($vaccines as $vaccine): ?>
+        <?php foreach ($vaccines as $vaccineIndex => $vaccine): ?>
           <div class="col-md-6 col-xl-4">
             <article class="dashboard-card">
               <div class="dashboard-card-icon"><i class="fa-solid fa-shield-virus"></i></div>
@@ -149,6 +151,9 @@ try {
                 <span class="badge bg-info-subtle text-info-emphasis me-2">Required doses: <?= (int)$vaccine['required_doses'] ?></span>
                 <span class="badge bg-secondary-subtle text-secondary-emphasis">Dose gap: <?= (int)$vaccine['gap_days'] ?> day(s)</span>
               </div>
+              <?php if ($vaccineIndex < 3 && $sharedCenterId > 0): ?>
+                <p class="small text-muted mt-3 mb-0"><i class="fa-solid fa-location-dot me-1"></i><?= e($sharedCenter['name']) ?></p>
+              <?php endif; ?>
               <?php if ($role === 'Patient'): ?>
                 <button class="btn btn-solid-nhre w-100 mt-3" type="button" data-bs-toggle="modal" data-bs-target="#bookVaccineModal<?= e(str_replace([' ', '-'], '', $vaccine['name'])) ?>">
                   <i class="fa-solid fa-calendar-plus"></i> Book
@@ -182,11 +187,16 @@ try {
                           <?php endfor; ?>
                         </select>
                       </div>
-                      <div class="row g-3 mb-3 vaccination-location-picker">
-                        <div class="col-md-6"><label class="form-label">Division</label><select class="form-select js-division" required><option value="" selected disabled>Select division</option><?php foreach ($divisions as $division): ?><option value="<?= e($division) ?>"><?= e($division) ?></option><?php endforeach; ?></select></div>
-                        <div class="col-md-6"><label class="form-label">City / district</label><select class="form-select js-district" disabled required><option value="" selected disabled>Select city / district</option></select></div>
-                        <div class="col-12"><label class="form-label">Preferred hospital / vaccination center</label><select class="form-select js-hospital" name="center_id" disabled required><option value="" selected disabled>Select hospital</option></select><div class="form-text">Hospitals appear after you choose a division and city/district.</div></div>
-                      </div>
+                      <?php if ($vaccineIndex < 3 && $sharedCenterId > 0): ?>
+                        <input type="hidden" name="center_id" value="<?= $sharedCenterId ?>">
+                        <div class="mb-3"><label class="form-label">Vaccination center</label><input class="form-control" value="<?= e($sharedCenter['name']) ?>, <?= e($sharedCenter['district']) ?>" readonly></div>
+                      <?php else: ?>
+                        <div class="row g-3 mb-3 vaccination-location-picker">
+                          <div class="col-md-6"><label class="form-label">Division</label><select class="form-select js-division" required><option value="" selected disabled>Select division</option><?php foreach ($divisions as $division): ?><option value="<?= e($division) ?>"><?= e($division) ?></option><?php endforeach; ?></select></div>
+                          <div class="col-md-6"><label class="form-label">City / district</label><select class="form-select js-district" disabled required><option value="" selected disabled>Select city / district</option></select></div>
+                          <div class="col-12"><label class="form-label">Preferred hospital / vaccination center</label><select class="form-select js-hospital" name="center_id" disabled required><option value="" selected disabled>Select hospital</option></select><div class="form-text">Hospitals appear after you choose a division and city/district.</div></div>
+                        </div>
+                      <?php endif; ?>
                       <div class="row g-3">
                         <div class="col-sm-6"><label class="form-label">Preferred date</label><input type="date" class="form-control" name="booking_date" min="<?= date('Y-m-d') ?>" required></div>
                         <div class="col-sm-6"><label class="form-label">Preferred time</label><input type="time" class="form-control" name="booking_time"></div>

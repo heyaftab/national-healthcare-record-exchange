@@ -58,7 +58,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_test') {
     }
 
     try {
-        $stmt = db()->prepare('SELECT id, availability FROM medical_tests WHERE id = ? LIMIT 1');
+        $stmt = db()->prepare('SELECT id, availability, center_id, department, name FROM medical_tests WHERE id = ? LIMIT 1');
         $stmt->execute([$test_id]);
         $test = $stmt->fetch();
 
@@ -78,6 +78,13 @@ if (isset($_POST['action']) && $_POST['action'] === 'book_test') {
             'Test booking received',
             'Your medical test booking request has been received and is awaiting review.',
             'medical_test'
+        );
+        notify_center_lab_technicians(
+            (int)$test['center_id'],
+            'New medical test booking',
+            'A patient booked ' . $test['name'] . '. Review the request in your test bookings.',
+            'medical_test',
+            (string)$test['department']
         );
 
         $_SESSION['success'] = 'Your test booking request has been submitted.';
