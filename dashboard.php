@@ -81,79 +81,6 @@ $success = session_pull('success');
         </div>
       <?php endif; ?>
 
-      <?php if (false): ?><div class="row g-4 mt-1 dashboard-cards">
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-user"></i></div>
-            <h2>Profile</h2>
-            <p>View and manage your verified NHRE identity details.</p>
-            <a href="profile.php" class="dashboard-card-link">Open Profile</a>
-          </article>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-syringe"></i></div>
-            <h2>Vaccination</h2>
-            <p>Track vaccine schedules, required doses, and doctor reports in one place.</p>
-            <a href="vaccination.php" class="dashboard-card-link">Open Vaccination</a>
-          </article>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-bell"></i></div>
-            <h2>Notifications</h2>
-            <p>Review medical approvals, blood donation updates, and profile alerts.</p>
-            <a href="notifications.php" class="dashboard-card-link">Open Notifications</a>
-          </article>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-pills"></i></div>
-            <h2>Pharmacy</h2>
-            <p>View prescriptions, manage medicine inventory, and track dispensing.</p>
-            <a href="pharmacy.php" class="dashboard-card-link">Open Pharmacy</a>
-          </article>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-calendar-check"></i></div>
-            <h2>Appointments</h2>
-            <p>Book, approve, and review appointments directly from your dashboard.</p>
-            <a href="appointments.php" class="dashboard-card-link">Open Appointments</a>
-          </article>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-droplet"></i></div>
-            <h2>Blood Donation</h2>
-            <p>Register as a donor, request blood, and view available donors by district.</p>
-            <a href="blood_donation.php" class="dashboard-card-link">Open Blood Donation</a>
-          </article>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-flask-vial"></i></div>
-            <h2>Tests</h2>
-            <p>Browse medical tests, book diagnostics, and track your lab bookings in one place.</p>
-            <a href="medical_tests.php" class="dashboard-card-link">Open Marketplace</a>
-          </article>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-          <article class="dashboard-card dashboard-card-danger">
-            <div class="dashboard-card-icon"><i class="fa-solid fa-right-from-bracket"></i></div>
-            <h2>Logout</h2>
-            <p>End this protected session and return to the login page.</p>
-            <a href="logout.php" class="dashboard-card-link">Logout Securely</a>
-          </article>
-        </div>
-      </div><?php endif; ?>
 
       <section class="mt-4">
         <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
@@ -184,30 +111,6 @@ $success = session_pull('success');
         </div>
       </section>
 
-      <?php if (false): ?><section class="mt-4">
-        <div class="dashboard-hero glass-card">
-          <div>
-            <span class="auth-kicker">Appointment Workspace</span>
-            <h1>Open the dedicated appointment page</h1>
-            <p>Use the full appointment workspace to search doctors, book visits, and manage requests.</p>
-          </div>
-          <div class="dashboard-user-pill">
-            <i class="fa-solid fa-calendar-check"></i>
-            <span><?= e($role) ?></span>
-          </div>
-        </div>
-
-        <div class="row g-4 mt-1">
-          <div class="col-12">
-            <article class="dashboard-card">
-              <div class="dashboard-card-icon"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
-              <h2>Continue to appointments</h2>
-              <p>Booking and management actions now happen on the dedicated appointment page.</p>
-              <a href="appointments.php" class="btn btn-solid-nhre mt-2">Open Appointment Page</a>
-            </article>
-          </div>
-        </div>
-      </section><?php endif; ?>
     </section>
   </main>
 

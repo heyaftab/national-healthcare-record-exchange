@@ -59,8 +59,12 @@ if ($sidebarRole === 'Patient') {
         ['prescriptions.php', 'fa-prescription', 'Prescriptions'],
         ['inventory.php', 'fa-boxes-stacked', 'Medicine Inventory'],
         ['stock.php', 'fa-boxes-packing', 'Stock Management'],
+        ['stock_out.php', 'fa-minus-circle', 'Stock Out'],
+        ['stock_adjustment.php', 'fa-sliders', 'Stock Adjustment'],
+        ['activity_log.php', 'fa-clipboard-list', 'Audit Log'],
         ['patient_search.php', 'fa-magnifying-glass', 'Patient Search'],
         ['dispensing_history.php', 'fa-clock-rotate-left', 'Dispensing History'],
+        ['reports.php', 'fa-chart-column', 'Reports'],
     ]);
 } elseif ($sidebarRole === 'Hospital Admin') {
     $sidebarLinks = array_merge($sidebarLinks, [
@@ -80,17 +84,13 @@ if ($sidebarRole === 'Patient') {
     ]);
 } elseif ($sidebarRole === 'System Admin') {
     $sidebarLinks = array_merge($sidebarLinks, [
-        ['admin_operations.php?view=user-management', 'fa-users-gear', 'User Management'],
-        ['admin_operations.php?view=organizations', 'fa-building', 'Healthcare Organizations'],
-        ['admin_operations.php?view=medical-records', 'fa-notes-medical', 'Medical Records'],
-        ['appointments.php', 'fa-calendar-check', 'Appointments'],
-        ['admin_operations.php?view=prescriptions', 'fa-pills', 'Prescriptions'],
-        ['medical_tests.php', 'fa-flask-vial', 'Laboratory Reports'],
-        ['admin_operations.php?view=access-overview', 'fa-shield-halved', 'Access Permissions'],
+        ['admin_operations.php?view=user-management', 'fa-users-gear', 'Users'],
+        ['admin_operations.php?view=organizations', 'fa-building', 'Organizations'],
+        ['admin_operations.php?view=roles-permissions', 'fa-user-shield', 'Roles & Permissions'],
+        ['admin_operations.php?view=patients', 'fa-user-injured', 'Patients'],
         ['admin_operations.php?view=audit-logs', 'fa-clipboard-list', 'Audit Logs'],
-        ['admin_operations.php?view=reports', 'fa-chart-column', 'Reports & Analytics'],
-        ['admin_operations.php?view=system-statistics', 'fa-chart-pie', 'System Statistics'],
-        ['admin_operations.php?view=settings', 'fa-sliders', 'System Settings'],
+        ['admin_operations.php?view=data-exchange', 'fa-network-wired', 'Data Exchange'],
+        ['admin_operations.php?view=reports', 'fa-chart-column', 'Reports'],
     ]);
 }
 

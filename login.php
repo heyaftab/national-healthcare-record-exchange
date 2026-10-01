@@ -1,9 +1,6 @@
 <?php
 require_once __DIR__ . '/auth/auth_check.php';
 ensure_demo_accounts();
-ensure_doctor_profile_columns();
-ensure_doctor_catalog_tables();
-ensure_demo_patients_and_records();
 redirect_if_authenticated();
 
 $errors = session_pull('errors', []);
@@ -18,21 +15,51 @@ $demo_accounts = [
     ['role' => 'Lab Technician', 'email' => 'nusrat.jahan.lab@nhre.gov', 'password' => 'LabTech123!', 'badge' => 'warning', 'seed' => 'nusrat-jahan-lab'],
     ['role' => 'Hospital Admin', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
     ['role' => 'System Admin', 'email' => 'sysadmin@nhre.gov', 'password' => 'SysAdmin123!', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
+    ['role' => 'Patient', 'fullname' => 'Farhana Rahman', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'badge' => 'primary', 'seed' => 'patient-farhana-rahman', 'email_note' => 'Primary patient'],
+    ['role' => 'Doctor', 'fullname' => 'Dr. Afsana Ahmed', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor123!', 'badge' => 'info', 'seed' => 'demo-doctor-001', 'email_note' => 'Primary doctor'],
+    ['role' => 'Pharmacist', 'fullname' => 'Ahsanul Haque', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
+    ['role' => 'Lab Technician', 'fullname' => 'Maksudul Islam', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
+    ['role' => 'Hospital Admin', 'fullname' => 'Dr. Mohammad Ashraf Karim', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
+    ['role' => 'System Admin', 'fullname' => 'Nusrat Jahan Chowdhury', 'email' => 'sysadmin@nhre.gov', 'password' => 'SysAdmin123!', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
 ];
 $demo_profile_photos = [];
+$demo_account_numbers = [];
+$demo_account_names = [];
 
 try {
     $emails = array_column($demo_accounts, 'email');
-    $photoStmt = db()->prepare('SELECT email, profile_photo FROM users WHERE email IN (' . implode(',', array_fill(0, count($emails), '?')) . ')');
-    $photoStmt->execute($emails);
-    foreach ($photoStmt->fetchAll() as $profile) {
-        $demo_profile_photos[(string)$profile['email']] = (string)($profile['profile_photo'] ?? '');
+    if ($emails !== []) {
+        $placeholders = implode(',', array_fill(0, count($emails), '?'));
+        $profileStmt = db()->prepare('SELECT email, fullname, profile_photo, account_number FROM users WHERE email IN (' . $placeholders . ')');
+        $profileStmt->execute($emails);
+        foreach ($profileStmt->fetchAll() as $profile) {
+            $email = (string)($profile['email'] ?? '');
+            if ($email !== '') {
+                $demo_profile_photos[$email] = (string)($profile['profile_photo'] ?? '');
+                $demo_account_numbers[$email] = (string)($profile['account_number'] ?? '');
+                $demo_account_names[$email] = (string)($profile['fullname'] ?? '');
+            }
+        }
     }
+    foreach ($demo_accounts as &$demoAccount) {
+        $demoAccount['account_number'] = $demo_account_numbers[$demoAccount['email']] ?? '—';
+        $demoAccount['fullname'] = $demo_account_names[$demoAccount['email']] ?? $demoAccount['role'];
+    }
+    unset($demoAccount);
 } catch (PDOException $e) {
+    foreach ($demo_accounts as &$demoAccount) {
+        $demoAccount['account_number'] = '—';
+        $demoAccount['fullname'] = $demoAccount['role'];
+    }
+    unset($demoAccount);
 }
 
 function demo_profile_picture(array $account, array $photos): string
 {
+    if (!empty($_SESSION['user_id']) && !empty($_SESSION['profile_photo'])) {
+        return $_SESSION['profile_photo'];
+    }
+
     $photo = $photos[$account['email']] ?? '';
     $isLocalPhoto = $photo !== '' && is_file(__DIR__ . '/' . $photo);
     $isCartoonAvatar = str_starts_with($photo, 'https://api.dicebear.com/9.x/avataaars/svg?');
@@ -171,6 +198,9 @@ function demo_profile_picture(array $account, array $photos): string
               <span class="auth-kicker">Account access</span>
               <h3>Available accounts</h3>
               <p>Select an account and click <strong>Use</strong> to fill the login form.</p>
+            <div class="demo-accounts-head">
+              <h3>Accounts</h3>
+              <p>Choose any account below and click <strong>Use</strong> to fill the login form.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-sm table-hover align-middle mb-0">
@@ -178,20 +208,22 @@ function demo_profile_picture(array $account, array $photos): string
                   <tr>
                     <th>Profile</th>
                     <th>Role</th>
-                    <th>Email</th>
+                    <th>Name</th>
                     <th>NHRE ID</th>
-                    <th>Password</th>
                     <th class="text-end">Action</th>
                   </tr>
                 </thead>
-                <tbody id="moreDoctorAccounts">
+                <tbody>
                   <?php foreach ($demo_accounts as $account): ?>
                     <tr class="<?= $account['email'] === 'nusrat.jahan.lab@nhre.gov' ? 'more-lab-account d-none' : '' ?>">
                       <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> account"></td>
                       <td><span class="badge bg-<?= e($account['badge']) ?>-subtle text-<?= e($account['badge']) ?>-emphasis"><?= e($account['role']) ?></span></td>
                       <td class="font-monospace"><?= e($account['email']) ?><?php if (!empty($account['email_note'])): ?> <span class="text-muted"><?= e($account['email_note']) ?></span><?php endif; ?><?php if ($account['role'] === 'Doctor'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleDoctorAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php elseif ($account['role'] === 'Patient'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="togglePatientAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php elseif ($account['email'] === 'lab@nhre.gov'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleLabAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php endif; ?></td>
+                    <tr>
+                      <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> account"></td>
+                      <td><span class="badge bg-<?= e($account['badge']) ?>-subtle text-<?= e($account['badge']) ?>-emphasis"><?= e($account['role']) ?></span></td>
+                      <td class="fw-semibold"><?= e($account['fullname'] ?? $account['role']) ?></td>
                       <td class="font-monospace"><?= e($account['account_number'] ?? '—') ?></td>
-                      <td class="font-monospace"><?= e($account['password']) ?></td>
                       <td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm" data-email="<?= e($account['email']) ?>" data-password="<?= e($account['password']) ?>">Use</button></td>
                     </tr>
                   <?php endforeach; ?>
@@ -292,6 +324,7 @@ function demo_profile_picture(array $account, array $photos): string
       this.setAttribute('aria-expanded', String(!expanded));
       this.textContent = expanded ? 'More' : 'Hide';
     });
+
   </script>
 </body>
 </html>

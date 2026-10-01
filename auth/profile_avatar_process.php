@@ -37,6 +37,7 @@ try {
         }
     }
 
+    $_SESSION['profile_photo'] = $avatarUrl;
     $_SESSION['success'] = 'Your cartoon profile picture has been updated.';
 } catch (PDOException $e) {
     $_SESSION['errors'] = ['Unable to update your cartoon profile picture. Please try again later.'];

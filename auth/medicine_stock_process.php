@@ -74,6 +74,7 @@ try {
     $batch_id = (int)db()->lastInsertId();
 
     log_audit('ADD_STOCK', 'batch', $batch_id, 'Added ' . $quantity . ' units of "' . $medicine['name'] . '" (batch ' . $batch_no . ', expiry ' . $expiry_date . ')');
+    pharmacist_stock_alerts($medicine_id);
     $_SESSION['success'] = 'Stock added: ' . $quantity . ' units of "' . $medicine['name'] . '" (batch ' . $batch_no . ').';
 } catch (PDOException $e) {
     $_SESSION['errors'] = ['Could not add stock. Please try again.'];
