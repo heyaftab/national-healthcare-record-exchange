@@ -95,8 +95,9 @@ if ($errors) {
 }
 
 try {
-    $stmt = db()->prepare('SELECT id FROM users WHERE (email = ? OR phone = ?) AND id != ? LIMIT 1');
-    $stmt->execute([$email, $phone, $user_id]);
+    $normalized_phone = preg_replace('/\D+/', '', $phone) ?: '';
+    $stmt = db()->prepare('SELECT id FROM users WHERE (LOWER(email) = LOWER(?) OR REPLACE(REPLACE(REPLACE(REPLACE(phone, " ", ""), "-", ""), "+", ""), "(", "") = ?) AND id != ? LIMIT 1');
+    $stmt->execute([$email, $normalized_phone, $user_id]);
     if ($stmt->fetch()) {
         $_SESSION['errors'] = ['That email or phone number already belongs to another account.'];
         $_SESSION['old'] = compact('fullname', 'email', 'phone', 'date_of_birth', 'nationality', 'gender', 'address', 'emergency_contact', 'blood_group', 'marital_status', 'occupation');
@@ -131,6 +132,7 @@ try {
 
     $_SESSION['fullname'] = $fullname;
     $_SESSION['email'] = $email;
+    $_SESSION['profile_photo'] = $profile_photo_path ?? $current_photo;
     $_SESSION['success'] = 'Profile updated successfully.';
     redirect('../profile.php');
 } catch (PDOException $e) {

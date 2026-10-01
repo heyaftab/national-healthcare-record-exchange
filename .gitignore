@@ -8,6 +8,10 @@
 !/uploads/profile_pics/.gitkeep
 /uploads/test_results/*
 !/uploads/test_results/.gitkeep
+!/uploads/test_results/.htaccess
+/uploads/private_documents/*
+!/uploads/private_documents/.gitkeep
+!/uploads/private_documents/.htaccess
 
 # Runtime and debug output
 *.log

@@ -12,8 +12,8 @@ $success = session_pull('success');
 $accountView = (string)($_GET['role'] ?? '');
 $roleViews = [
     '' => ['title' => 'User account directory', 'description' => 'Create and manage patient, clinical, pharmacy, and laboratory accounts for your hospital.', 'roles' => ['Patient', 'Doctor', 'Pharmacist', 'Lab Technician']],
-    'Doctor' => ['title' => 'Doctor accounts', 'description' => 'Manage every registered doctor account in NHRE, including creating and removing accounts.', 'roles' => ['Doctor']],
-    'Patient' => ['title' => 'Patient accounts', 'description' => 'Manage every registered patient account in NHRE, including creating and removing accounts.', 'roles' => ['Patient']],
+    'Doctor' => ['title' => 'Doctor accounts', 'description' => 'Manage doctor accounts assigned to your hospital.', 'roles' => ['Doctor']],
+    'Patient' => ['title' => 'Patient accounts', 'description' => 'Manage patient accounts assigned to your hospital.', 'roles' => ['Patient']],
     'staff' => ['title' => 'Hospital staff accounts', 'description' => 'Create and manage pharmacist and laboratory technician accounts for your hospital.', 'roles' => ['Pharmacist', 'Lab Technician']],
 ];
 if (!isset($roleViews[$accountView])) {
@@ -25,12 +25,14 @@ try {
     $hospitalStmt = db()->prepare('SELECT hospital_id FROM users WHERE id = ? LIMIT 1');
     $hospitalStmt->execute([(int)$_SESSION['user_id']]);
     $hospitalId = (int)$hospitalStmt->fetchColumn();
+    if ($hospitalId <= 0) {
+        throw new RuntimeException('Your administrator account is not assigned to a hospital.');
+    }
     $placeholders = implode(', ', array_fill(0, count($activeView['roles']), '?'));
-    $scope = in_array($accountView, ['Patient', 'Doctor'], true) ? '' : ' AND hospital_id = ?';
-    $stmt = db()->prepare("SELECT id, fullname, email, role FROM users WHERE role IN ($placeholders)$scope ORDER BY role, fullname");
-    $stmt->execute(in_array($accountView, ['Patient', 'Doctor'], true) ? $activeView['roles'] : [...$activeView['roles'], $hospitalId]);
+    $stmt = db()->prepare("SELECT id, fullname, email, role FROM users WHERE role IN ($placeholders) AND hospital_id = ? ORDER BY role, fullname");
+    $stmt->execute([...$activeView['roles'], $hospitalId]);
     $accounts = $stmt->fetchAll();
-} catch (PDOException $e) {
+} catch (PDOException|RuntimeException $e) {
     $errors[] = 'Unable to load user accounts.';
     $accounts = [];
 }
@@ -49,20 +51,7 @@ try {
 </head>
 <body class="dashboard-body">
   <?php require __DIR__ . '/includes/sidebar.php'; ?>
-  <nav class="dashboard-nav">
-    <div class="container d-flex align-items-center justify-content-between gap-3">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
-        <img src="assets/images/nhre-logo.svg" alt="NHRE" class="nhre-logo-img">
-      </a>
-      <div class="d-flex align-items-center gap-2">
-        <a href="appointments.php" class="btn btn-outline-light btn-sm">Back to appointments</a>
-        <a href="logout.php" class="btn btn-dashboard-logout ripple">
-          <i class="fa-solid fa-arrow-right-from-bracket"></i>
-          <span>Logout</span>
-        </a>
-      </div>
-    </div>
-  </nav>
+  <?php require __DIR__ . '/includes/topnav.php'; ?>
 
   <main class="dashboard-main">
     <section class="container">

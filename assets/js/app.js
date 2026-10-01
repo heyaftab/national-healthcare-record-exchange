@@ -543,6 +543,22 @@
     window.__nhreToastTimer = window.setTimeout(() => toast.classList.remove('show'), 3200);
   };
 
+  /* ---------- Interactive admin report pie chart ---------- */
+  document.querySelectorAll('.js-exchange-pie').forEach((chart) => {
+    chart.addEventListener('pointermove', (event) => {
+      const rect = chart.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const x = ((event.clientX - rect.left) / rect.width) - 0.5;
+      const y = ((event.clientY - rect.top) / rect.height) - 0.5;
+      chart.style.setProperty('--pie-tilt-x', `${(x * 11).toFixed(2)}deg`);
+      chart.style.setProperty('--pie-tilt-y', `${(-y * 11).toFixed(2)}deg`);
+    });
+    chart.addEventListener('pointerleave', () => {
+      chart.style.setProperty('--pie-tilt-x', '0deg');
+      chart.style.setProperty('--pie-tilt-y', '0deg');
+    });
+  });
+
   /* ---------- Smooth page transitions ---------- */
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     document.querySelectorAll('a[href]').forEach((link) => {

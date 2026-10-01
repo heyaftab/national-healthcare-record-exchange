@@ -10,13 +10,13 @@ try {
     $accounts = [];
     foreach ($rows as $row) {
         $email = (string)$row['email'];
-        if ($email === 'doctor001@nhre.dev' || !preg_match('/^doctor(\\d{3})@nhre\\.dev$/', $email, $matches)) {
+        if (!preg_match('/^doctor(\\d{3})@nhre\\.dev$/', $email, $matches)) {
             continue;
         }
         $accounts[] = [
             'fullname' => (string)$row['fullname'],
             'email' => $email,
-            'password' => 'Doctor' . $matches[1] . '!',
+            'password' => 'Doctor123!',
         ];
     }
     echo json_encode($accounts, JSON_THROW_ON_ERROR);

@@ -36,15 +36,26 @@ $success = session_pull('success');
       <img src="assets/images/nhre-logo.svg" alt="NHRE" class="nhre-logo-img">
     </a>
 
-    <section class="auth-shell container">
+    <div class="auth-mini-brand" aria-label="NHRE brand mark">
+      <div class="auth-mini-brand-mark">
+        <img src="assets/images/nhre-logo.svg" alt="NHRE" aria-hidden="true">
+      </div>
+    </div>
+
+    <section class="auth-shell auth-compact-shell container">
       <div class="row justify-content-center">
-        <div class="col-lg-5 col-md-8">
-          <div class="card auth-card glass-card">
+        <div class="col-lg-6 col-md-8">
+          <div class="card auth-card auth-compact-card glass-card">
             <div class="card-body">
-              <div class="auth-card-head">
-                <span class="auth-kicker">Create new password</span>
+              <div class="auth-compact-header">
+                <span class="auth-step-badge">Create new password</span>
                 <h2>Reset your password</h2>
-                <p>Choose a strong new password for your account.</p>
+                <p>Choose a strong password to secure your NHRE account.</p>
+              </div>
+
+              <div class="auth-inline-note">
+                <i class="fa-solid fa-key"></i>
+                <span>Use at least 8 characters with uppercase, lowercase, a number, and a symbol.</span>
               </div>
 
               <?php if ($success): ?>
@@ -71,18 +82,18 @@ $success = session_pull('success');
 
                 <div class="form-floating mb-3">
                   <input type="password" class="form-control" id="password" name="password" placeholder="New Password" required minlength="8">
-                  <label for="password"><i class="fa-solid fa-lock"></i> New Password</label>
-                  <div class="invalid-feedback">Use 8+ chars with uppercase, lowercase, number, and symbol.</div>
+                  <label for="password"><i class="fa-solid fa-lock"></i> New password</label>
+                  <div class="invalid-feedback">Use 8+ characters with uppercase, lowercase, number, and symbol.</div>
                 </div>
 
                 <div class="form-floating mb-3">
                   <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
-                  <label for="confirm_password"><i class="fa-solid fa-shield-halved"></i> Confirm Password</label>
+                  <label for="confirm_password"><i class="fa-solid fa-shield-halved"></i> Confirm password</label>
                   <div class="invalid-feedback">Passwords must match.</div>
                 </div>
 
                 <button type="submit" class="btn btn-auth-primary ripple w-100">
-                  <span>Update Password</span>
+                  <span>Update password</span>
                   <i class="fa-solid fa-key"></i>
                 </button>
               </form>

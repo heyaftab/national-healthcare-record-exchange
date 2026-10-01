@@ -103,17 +103,7 @@ try {
 </head>
 <body class="dashboard-body">
   <?php require __DIR__ . '/includes/sidebar.php'; ?>
-  <nav class="dashboard-nav">
-    <div class="container d-flex align-items-center justify-content-between gap-3">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.php">
-        <img src="assets/images/nhre-logo.svg" alt="NHRE" class="nhre-logo-img">
-      </a>
-      <div class="d-flex gap-2">
-        <a href="dashboard.php" class="btn btn-dashboard-logout ripple"><i class="fa-solid fa-house"></i> <span>Dashboard</span></a>
-        <a href="notifications.php" class="btn btn-dashboard-logout ripple"><i class="fa-solid fa-bell"></i> <span>Notifications</span></a>
-      </div>
-    </div>
-  </nav>
+  <?php require __DIR__ . '/includes/topnav.php'; ?>
 
   <main class="dashboard-main">
     <section class="container">
