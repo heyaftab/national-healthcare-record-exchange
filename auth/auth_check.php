@@ -2020,9 +2020,10 @@ function ensure_medical_test_tables_exists(): void
             $mapServices->execute([$sharedCenterId, 'Mirpur, Dhaka', 'Blood Sugar Test', 'CBC Test', 'Lipid Profile']);
         }
         $patientId = (int)db()->query("SELECT id FROM users WHERE email = 'patient@nhre.gov' AND role = 'Patient' LIMIT 1")->fetchColumn();
-        if ($patientId > 0) {
-        $patientId = default_patient_id_for_demo_seed();
-        if ($patientId !== null) {
+        if ($patientId <= 0) {
+            $patientId = default_patient_id_for_demo_seed();
+        }
+        if ($patientId !== null && $patientId > 0) {
             $seedBooking = db()->prepare('INSERT INTO medical_test_bookings (test_id, user_id, booking_date, booking_time, status, result_notes, created_at, updated_at) SELECT id, ?, ?, ?, ?, ?, NOW(), NOW() FROM medical_tests WHERE center_id IS NOT NULL ORDER BY id LIMIT 1');
             $statusCount = db()->prepare('SELECT COUNT(*) FROM medical_test_bookings WHERE user_id = ? AND status = ?');
             foreach ([
