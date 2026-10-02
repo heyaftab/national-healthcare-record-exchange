@@ -8,19 +8,12 @@ $old = session_pull('old', []);
 $success = session_pull('success');
 $error = session_pull('error');
 $demo_accounts = [
-    ['role' => 'Patient', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'account_number' => 'NHRE-P-000001', 'badge' => 'primary', 'seed' => 'demo-patient', 'email_note' => '(001–025)'],
-    ['role' => 'Doctor', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor001!', 'badge' => 'info', 'seed' => 'demo-doctor-001', 'email_note' => '(001–100)'],
-    ['role' => 'Pharmacist', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
-    ['role' => 'Lab Technician', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
-    ['role' => 'Lab Technician', 'email' => 'nusrat.jahan.lab@nhre.gov', 'password' => 'LabTech123!', 'badge' => 'warning', 'seed' => 'nusrat-jahan-lab'],
-    ['role' => 'Hospital Admin', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
-    ['role' => 'System Admin', 'email' => 'sysadmin@nhre.gov', 'password' => 'SysAdmin123!', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
-    ['role' => 'Patient', 'fullname' => 'Farhana Rahman', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'badge' => 'primary', 'seed' => 'patient-farhana-rahman', 'email_note' => 'Primary patient'],
-    ['role' => 'Doctor', 'fullname' => 'Dr. Afsana Ahmed', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor123!', 'badge' => 'info', 'seed' => 'demo-doctor-001', 'email_note' => 'Primary doctor'],
-    ['role' => 'Pharmacist', 'fullname' => 'Ahsanul Haque', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
-    ['role' => 'Lab Technician', 'fullname' => 'Maksudul Islam', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
-    ['role' => 'Hospital Admin', 'fullname' => 'Dr. Mohammad Ashraf Karim', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
-    ['role' => 'System Admin', 'fullname' => 'Nusrat Jahan Chowdhury', 'email' => 'sysadmin@nhre.gov', 'password' => 'SysAdmin123!', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
+  ['role' => 'Patient', 'fullname' => 'Farhana Rahman', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'badge' => 'primary', 'seed' => 'patient-farhana-rahman'],
+  ['role' => 'Doctor', 'fullname' => 'Dr. Afsana Ahmed', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor123!', 'badge' => 'info', 'seed' => 'demo-doctor-001'],
+  ['role' => 'Pharmacist', 'fullname' => 'Ahsanul Haque', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
+  ['role' => 'Lab Technician', 'fullname' => 'Maksudul Islam', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
+  ['role' => 'Hospital Admin', 'fullname' => 'Dr. Mohammad Ashraf Karim', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
+  ['role' => 'System Admin', 'fullname' => 'Nusrat Jahan Chowdhury', 'email' => 'sysadmin@nhre.gov', 'password' => 'SysAdmin123!', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
 ];
 $demo_profile_photos = [];
 $demo_account_numbers = [];
@@ -81,7 +74,7 @@ function demo_profile_picture(array $account, array $photos): string
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260811-16">
+  <link rel="stylesheet" href="assets/css/styles.css?v=20261003-1">
 <script>
   (function () {
     try {
@@ -194,13 +187,10 @@ function demo_profile_picture(array $account, array $photos): string
       <div class="row g-4 justify-content-center">
         <div class="col-lg-10">
           <div class="demo-accounts glass-card">
-              <div class="demo-accounts-head">
-              <span class="auth-kicker">Account access</span>
-              <h3>Available accounts</h3>
-              <p>Select an account and click <strong>Use</strong> to fill the login form.</p>
             <div class="demo-accounts-head">
+              <span class="auth-kicker">Account access</span>
               <h3>Accounts</h3>
-              <p>Choose any account below and click <strong>Use</strong> to fill the login form.</p>
+              <p>Select an account and click <strong>Use</strong> to fill the login form.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-sm table-hover align-middle mb-0">
@@ -215,10 +205,6 @@ function demo_profile_picture(array $account, array $photos): string
                 </thead>
                 <tbody>
                   <?php foreach ($demo_accounts as $account): ?>
-                    <tr class="<?= $account['email'] === 'nusrat.jahan.lab@nhre.gov' ? 'more-lab-account d-none' : '' ?>">
-                      <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> account"></td>
-                      <td><span class="badge bg-<?= e($account['badge']) ?>-subtle text-<?= e($account['badge']) ?>-emphasis"><?= e($account['role']) ?></span></td>
-                      <td class="font-monospace"><?= e($account['email']) ?><?php if (!empty($account['email_note'])): ?> <span class="text-muted"><?= e($account['email_note']) ?></span><?php endif; ?><?php if ($account['role'] === 'Doctor'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleDoctorAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php elseif ($account['role'] === 'Patient'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="togglePatientAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php elseif ($account['email'] === 'lab@nhre.gov'): ?> <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="toggleLabAccounts" aria-expanded="false" aria-controls="moreDoctorAccounts">More</button><?php endif; ?></td>
                     <tr>
                       <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> account"></td>
                       <td><span class="badge bg-<?= e($account['badge']) ?>-subtle text-<?= e($account['badge']) ?>-emphasis"><?= e($account['role']) ?></span></td>

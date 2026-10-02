@@ -1753,6 +1753,7 @@ function ensure_demo_accounts(): void
     }
     $accounts = [
         ['Demo Patient',          '0000000001', 'patient@nhre.gov', '+8801000000001', 'Patient123!', 'Patient'],
+        ['Dr. Afsana Ahmed',      '10000000001', 'doctor001@nhre.dev', '+8801710000001', 'Doctor123!', 'Doctor'],
         ['Hospital Administrator', '0000000002', 'admin@nhre.gov', '+8801000000002', 'Admin123!', 'Hospital Admin'],
         ['System Administrator',   '0000000003', 'sysadmin@nhre.gov', '+8801000000003', 'SysAdmin123!', 'System Admin'],
         ['Demo Pharmacist',        '0000000004', 'pharmacist@nhre.gov', '+8801000000004', 'Pharmacist123!', 'Pharmacist'],
@@ -1819,6 +1820,7 @@ function ensure_demo_accounts(): void
                 $role,
             ]);
         }
+        assign_missing_account_numbers();
     } catch (PDOException $e) {
     }
 }

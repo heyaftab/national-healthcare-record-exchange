@@ -3303,8 +3303,26 @@ html[data-theme="dark"] body:has(.hero) main {
 .btn-auth-primary span, .btn-auth-primary i { position: relative; z-index: 1; }
 
 html[data-theme="dark"] .auth-card { background: linear-gradient(145deg, #142b45, #101f37); }
+html[data-theme="dark"] .auth-card .card-body {
+  color: var(--ink);
+  background: linear-gradient(180deg, #142b45, #101f37);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+}
 html[data-theme="dark"] .auth-back-link, html[data-theme="dark"] .auth-form .form-floating > .form-control, html[data-theme="dark"] .auth-form .form-floating > .form-select, html[data-theme="dark"] .role-picker-options label { background: rgba(9, 25, 45, .76); }
+html[data-theme="dark"] .auth-form .form-floating > .form-control,
+html[data-theme="dark"] .auth-form .form-floating > .form-select {
+  color: var(--ink);
+  border-color: #36516a;
+}
+html[data-theme="dark"] .auth-form .form-floating > .form-control:hover,
+html[data-theme="dark"] .auth-form .form-floating > .form-control:focus,
+html[data-theme="dark"] .auth-form .form-floating > .form-select:hover,
+html[data-theme="dark"] .auth-form .form-floating > .form-select:focus {
+  color: var(--ink);
+  background: #12263f;
+}
 html[data-theme="dark"] .auth-security-badge { background: linear-gradient(135deg, rgba(22, 81, 94, .7), rgba(48, 42, 94, .6)); border-color: rgba(109,236,238,.2); }
+html[data-theme="dark"] .auth-security-badge { color: #dce7f2; }
 html[data-theme="dark"] .auth-security-badge b { color: #83e9ee; }
 
 /* Keep auth labels consistently above the field value in every state. */
