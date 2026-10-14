@@ -8,12 +8,12 @@
   },
   "routes": [
     {
-      "src": "/(.*\\.php)$",
-      "dest": "/api/index.php?path=$1"
-    },
-    {
       "src": "/(database|config|includes|auth|uploads/private_documents|uploads/test_results)(/.*)?$",
       "status": 404
+    },
+    {
+      "src": "/(.*\\.php)$",
+      "dest": "/api/index.php?path=$1"
     },
     { "handle": "filesystem" },
     {

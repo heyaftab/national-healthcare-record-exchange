@@ -103,24 +103,46 @@ php -S localhost:8000
 
 ## Deploying to Vercel
 
-The project includes a Vercel PHP runtime configuration and a dispatcher that
-serves the existing `.php` pages. The original pages remain in the project and
-can continue to use their current relative links and includes.
+The repository includes `vercel.json` and a PHP dispatcher for the existing
+pages. Vercel runs PHP requests as serverless functions; this is not a static
+PHP host. A persistent managed database is required for accounts, sessions,
+and uploaded files.
 
-1. Push the complete project to a Git repository and import it into Vercel.
-   Keep the project root as the Vercel Root Directory; no build command is
-   needed.
-2. Provision a managed MySQL database that accepts connections from Vercel.
-   Import `database/nhre.sql` into it using the provider's database tools.
-3. In Vercel Project Settings → Environment Variables, add `DB_HOST`,
-   `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` for each environment you will deploy.
-   `.env.example` lists the variable names. Set `NHRE_SESSION_STORAGE=database`
-   and `NHRE_FILE_STORAGE=database` to persist sessions, profile photos, lab
-   results, and private documents in the database. The app creates its support
-   tables automatically. Do not commit real credentials.
-4. Redeploy after setting the variables. Check the deployment at `/` and at
-   existing routes such as `/login.php`.
+1. Push the project to GitHub, GitLab, or Bitbucket and import the repository
+   into Vercel. Set the **Root Directory** to the repository root. There is no
+   frontend build step; leave the build command empty. Keep the included
+   `vercel.json` so Vercel uses the PHP runtime and routes page requests through
+   `api/index.php`.
+2. Create a MySQL database with a provider that allows connections from Vercel.
+   Create the database and user in the provider's dashboard, then import
+   `database/nhre.sql` into that database. The SQL file contains `CREATE
+   DATABASE` and `USE nhre` for local setup; for a hosted provider, select the
+   database you created and remove or adjust those two statements if the
+   provider does not allow database creation. Confirm the database user can
+   create tables because the app initializes its session and file storage
+   tables when it connects.
+3. In **Vercel Project Settings > Environment Variables**, add these values for
+   every environment you plan to use (Preview and Production):
 
+   | Variable | Value |
+   | --- | --- |
+   | `DB_HOST` | Hostname from your database provider |
+   | `DB_PORT` | Provider's port, usually `3306` |
+   | `DB_NAME` | Name of the database you created |
+   | `DB_USER` | Database user |
+   | `DB_PASS` | Database password |
+   | `NHRE_SESSION_STORAGE` | `database` |
+   | `NHRE_FILE_STORAGE` | `database` |
+
+   `.env.example` lists the same variable names. Do not commit actual database
+   credentials. Database storage is required because Vercel's function
+   filesystem is temporary; it keeps logins and uploaded profile photos, lab
+   results, and private documents available across invocations.
+4. Redeploy after adding the variables. Open `/` and `/login.php`; then try a
+   login and an upload to verify the database connection and persistent
+   storage. If the deployment returns a server error, inspect the function
+   logs in Vercel and confirm the database accepts connections from the
+   deployment region.
 ### Vercel runtime limits
 
 - The PHP runtime is serverless. Enable the database storage environment
