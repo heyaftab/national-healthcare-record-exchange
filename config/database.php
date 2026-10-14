@@ -56,7 +56,9 @@ function db(): PDO
 function nhre_store_uploaded_file(string $tmpPath, string $directory, string $storedName, string $mimeType): bool
 {
     if (getenv('NHRE_FILE_STORAGE') === 'database') {
-        if (!is_uploaded_file($tmpPath) && !is_file($tmpPath)) {
+        // Uploads must originate from PHP's HTTP upload mechanism. Accepting any
+        // readable local path here could expose arbitrary server files to storage.
+        if (!is_uploaded_file($tmpPath)) {
             return false;
         }
         $contents = file_get_contents($tmpPath);
@@ -175,16 +177,21 @@ function nhre_ensure_deployment_storage_tables(): void
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
     }
-    if (getenv('NHRE_SESSION_STORAGE') === 'database') {
-        db()->exec('CREATE TABLE IF NOT EXISTS nhre_sessions (
-            session_id VARCHAR(128) NOT NULL PRIMARY KEY,
-            session_data MEDIUMBLOB NOT NULL,
-            expires_at DATETIME NOT NULL,
-            KEY idx_nhre_sessions_expiry (expires_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-    }
+}
+
+function nhre_ensure_session_storage_table(): void
+{
+    db()->exec('CREATE TABLE IF NOT EXISTS nhre_sessions (
+        session_id VARCHAR(128) NOT NULL PRIMARY KEY,
+        session_data MEDIUMBLOB NOT NULL,
+        expires_at DATETIME NOT NULL,
+        KEY idx_nhre_sessions_expiry (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 }
 
 if (getenv('NHRE_FILE_STORAGE') === 'database' || getenv('NHRE_SESSION_STORAGE') === 'database') {
     nhre_ensure_deployment_storage_tables();
+}
+if (getenv('NHRE_SESSION_STORAGE') === 'database') {
+    nhre_ensure_session_storage_table();
 }
