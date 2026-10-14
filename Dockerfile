@@ -21,4 +21,4 @@ RUN mkdir -p uploads/profile_pics uploads/test_results uploads/private_documents
 EXPOSE 8080
 
 # Railway supplies PORT at runtime; make Apache listen on that port.
-CMD ["sh", "-c", "port=\"${PORT:-8080}\"; sed -i \"s/^Listen 80$/Listen ${port}/\" /etc/apache2/ports.conf; sed -i \"s/:80>/:${port}>/\" /etc/apache2/sites-available/000-default.conf; exec apache2-foreground"]
+CMD ["sh", "-c", "for module in /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf; do [ -e \"$module\" ] || continue; case \"$module\" in */mpm_prefork.*) ;; *) rm -f \"$module\" ;; esac; done; a2enmod mpm_prefork rewrite >/dev/null; port=\"${PORT:-8080}\"; sed -i \"s/^Listen 80$/Listen ${port}/\" /etc/apache2/ports.conf; sed -i \"s/:80>/:${port}>/\" /etc/apache2/sites-available/000-default.conf; exec apache2-foreground"]
