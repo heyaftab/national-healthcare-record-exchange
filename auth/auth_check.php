@@ -17,6 +17,7 @@ function session_start_secure(): void
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
+    nhre_configure_sessions();
     session_start();
 }
 

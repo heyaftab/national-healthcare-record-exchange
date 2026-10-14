@@ -84,7 +84,7 @@ NHRE/
 4. Confirm database settings in [config/database.php](config/database.php):
 
 ```php
-DB_HOST = 'localhost';
+DB_HOST = '127.0.0.1';
 DB_NAME = 'nhre';
 DB_USER = 'root';
 DB_PASS = '';
@@ -100,6 +100,36 @@ php -S localhost:8000
 
 - http://localhost:8000
 - or http://localhost/NHRE/ when using XAMPP
+
+## Deploying to Vercel
+
+The project includes a Vercel PHP runtime configuration and a dispatcher that
+serves the existing `.php` pages. The original pages remain in the project and
+can continue to use their current relative links and includes.
+
+1. Push the complete project to a Git repository and import it into Vercel.
+   Keep the project root as the Vercel Root Directory; no build command is
+   needed.
+2. Provision a managed MySQL database that accepts connections from Vercel.
+   Import `database/nhre.sql` into it using the provider's database tools.
+3. In Vercel Project Settings → Environment Variables, add `DB_HOST`,
+   `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` for each environment you will deploy.
+   `.env.example` lists the variable names. Set `NHRE_SESSION_STORAGE=database`
+   and `NHRE_FILE_STORAGE=database` to persist sessions, profile photos, lab
+   results, and private documents in the database. The app creates its support
+   tables automatically. Do not commit real credentials.
+4. Redeploy after setting the variables. Check the deployment at `/` and at
+   existing routes such as `/login.php`.
+
+### Vercel runtime limits
+
+- The PHP runtime is serverless. Enable the database storage environment
+  variables above for sessions and uploads; the local XAMPP filesystem mode is
+  still the default for development.
+- Vercel does not provide MySQL. A reachable managed database is required;
+  the local `localhost` defaults are only for XAMPP development.
+- Treat the included demo accounts and database seed data as public demo data.
+  Do not use real patient data without a full security and privacy review.
 
 ## Demo accounts
 
@@ -154,4 +184,4 @@ This project also responds correctly through the local PHP server and the login,
 
 ## License
 
-No license file is currently included. Unless otherwise specified by the project owner, all rights are reserved by default.
+This project is licensed under the MIT License. See the [MIT License](LICENSE).

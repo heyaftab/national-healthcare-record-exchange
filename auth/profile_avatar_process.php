@@ -31,10 +31,10 @@ try {
     $updateStmt->execute([$avatarUrl, $userId]);
 
     if (str_starts_with($currentPhoto, 'uploads/profile_pics/')) {
-        $oldPhoto = __DIR__ . '/../' . $currentPhoto;
-        if (is_file($oldPhoto)) {
-            unlink($oldPhoto);
-        }
+        nhre_delete_stored_file('profile_pics', basename($currentPhoto));
+    } elseif (str_starts_with($currentPhoto, 'auth/stored_file.php?kind=profile&file=')) {
+        parse_str((string)parse_url($currentPhoto, PHP_URL_QUERY), $oldPhotoParams);
+        nhre_delete_stored_file('profile_pics', (string)($oldPhotoParams['file'] ?? ''));
     }
 
     $_SESSION['profile_photo'] = $avatarUrl;

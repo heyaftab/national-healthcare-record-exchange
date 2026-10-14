@@ -31,13 +31,6 @@ $errors = [];
 
 $profile_photo_path = null;
 $uploaded_photo_file = null;
-$upload_dir = __DIR__ . '/../uploads/profile_pics';
-if (!is_dir($upload_dir) && !mkdir($upload_dir, 0775, true) && !is_dir($upload_dir)) {
-    $errors[] = 'The profile photo directory could not be created.';
-} elseif (!is_writable($upload_dir)) {
-    $errors[] = 'The profile photo directory is not writable.';
-}
-
 $current_photo_stmt = db()->prepare('SELECT profile_photo FROM users WHERE id = ? LIMIT 1');
 $current_photo_stmt->execute([$user_id]);
 $current_photo = $current_photo_stmt->fetchColumn();
@@ -57,12 +50,13 @@ if (!empty($_FILES['profile_photo']['name']) && $_FILES['profile_photo']['error'
         $errors[] = 'Profile photo must be 2 MB or smaller.';
     } else {
         $filename = 'user_' . $user_id . '_' . bin2hex(random_bytes(8)) . '.' . $allowed_types[$mime];
-        $target = $upload_dir . '/' . $filename;
-        if (!move_uploaded_file($_FILES['profile_photo']['tmp_name'], $target)) {
+        if (!nhre_store_uploaded_file($_FILES['profile_photo']['tmp_name'], 'profile_pics', $filename, $mime)) {
             $errors[] = 'Unable to save the uploaded photo.';
         } else {
-            $uploaded_photo_file = $target;
-            $profile_photo_path = 'uploads/profile_pics/' . $filename;
+            $uploaded_photo_file = $filename;
+            $profile_photo_path = getenv('NHRE_FILE_STORAGE') === 'database'
+                ? 'auth/stored_file.php?kind=profile&file=' . rawurlencode($filename)
+                : 'uploads/profile_pics/' . $filename;
         }
     }
 } elseif (!empty($_FILES['profile_photo']['error']) && $_FILES['profile_photo']['error'] !== UPLOAD_ERR_NO_FILE) {
@@ -86,8 +80,8 @@ if ($date_of_birth !== '' && DateTimeImmutable::createFromFormat('Y-m-d', $date_
 }
 
 if ($errors) {
-    if ($uploaded_photo_file !== null && is_file($uploaded_photo_file)) {
-        unlink($uploaded_photo_file);
+    if ($uploaded_photo_file !== null) {
+        nhre_delete_stored_file('profile_pics', $uploaded_photo_file);
     }
     $_SESSION['errors'] = $errors;
     $_SESSION['old'] = compact('fullname', 'email', 'phone', 'date_of_birth', 'nationality', 'gender', 'address', 'emergency_contact', 'blood_group', 'marital_status', 'occupation');
@@ -124,9 +118,11 @@ try {
     ]);
 
     if ($profile_photo_path !== null && !empty($current_photo) && $current_photo !== $profile_photo_path) {
-        $old_photo_file = __DIR__ . '/../' . ltrim((string)$current_photo, '/');
-        if (is_file($old_photo_file)) {
-            unlink($old_photo_file);
+        if (str_starts_with((string)$current_photo, 'uploads/profile_pics/')) {
+            nhre_delete_stored_file('profile_pics', basename((string)$current_photo));
+        } elseif (str_starts_with((string)$current_photo, 'auth/stored_file.php?kind=profile&file=')) {
+            parse_str((string)parse_url((string)$current_photo, PHP_URL_QUERY), $oldPhotoParams);
+            nhre_delete_stored_file('profile_pics', (string)($oldPhotoParams['file'] ?? ''));
         }
     }
 
@@ -136,8 +132,8 @@ try {
     $_SESSION['success'] = 'Profile updated successfully.';
     redirect('../profile.php');
 } catch (PDOException $e) {
-    if ($uploaded_photo_file !== null && is_file($uploaded_photo_file)) {
-        unlink($uploaded_photo_file);
+    if ($uploaded_photo_file !== null) {
+        nhre_delete_stored_file('profile_pics', $uploaded_photo_file);
     }
     $_SESSION['errors'] = ['Unable to save your profile right now. Please try again later.'];
     redirect('../profile.php');
