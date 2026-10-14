@@ -60,6 +60,9 @@ try {
 
     redirect($user['role'] === 'Hospital Admin' || $user['role'] === 'System Admin' ? '../admin_dashboard.php' : '../dashboard.php');
 } catch (PDOException $e) {
+    // Keep database details out of the browser response, but make the cause
+    // available in the hosting logs for deployment troubleshooting.
+    error_log('NHRE login database error [' . $e->getCode() . ']: ' . $e->getMessage());
     $_SESSION['errors'] = ['Something went wrong. Please try again later.'];
     redirect('../login.php');
 }
