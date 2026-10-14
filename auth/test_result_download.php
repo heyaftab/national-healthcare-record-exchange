@@ -33,22 +33,20 @@ if (!$allowed) {
     exit('Access denied.');
 }
 
-$storageDir = realpath(__DIR__ . '/../uploads/test_results');
 $filename = basename((string)$booking['result_file']);
-$file = $storageDir !== false ? realpath($storageDir . DIRECTORY_SEPARATOR . $filename) : false;
-
-if ($storageDir === false || $file === false || !str_starts_with($file, $storageDir . DIRECTORY_SEPARATOR) || !is_file($file)) {
+$storedFile = nhre_read_stored_file('test_results', $filename);
+if ($storedFile === null) {
     http_response_code(404);
     exit('Stored file unavailable.');
 }
 
 $extension = pathinfo($filename, PATHINFO_EXTENSION);
 $downloadName = 'lab-result-' . (int)$booking['id'] . ($extension !== '' ? '.' . $extension : '');
-$mime = (new finfo(FILEINFO_MIME_TYPE))->file($file) ?: 'application/octet-stream';
+$mime = $storedFile['mime_type'] ?: 'application/octet-stream';
 
 header('Content-Type: ' . $mime);
-header('Content-Length: ' . filesize($file));
+header('Content-Length: ' . strlen($storedFile['contents']));
 header('Content-Disposition: attachment; filename="' . $downloadName . '"');
 header('X-Content-Type-Options: nosniff');
-readfile($file);
+echo $storedFile['contents'];
 exit;

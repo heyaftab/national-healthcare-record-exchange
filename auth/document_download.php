@@ -24,19 +24,17 @@ if (!$allowed) {
     exit('Access denied.');
 }
 
-$storageDir = realpath(__DIR__ . '/../uploads/private_documents');
 $filename = basename((string)$document['stored_name']);
-$file = $storageDir !== false ? realpath($storageDir . DIRECTORY_SEPARATOR . $filename) : false;
-
-if ($storageDir === false || $file === false || !str_starts_with($file, $storageDir . DIRECTORY_SEPARATOR) || !is_file($file)) {
+$storedFile = nhre_read_stored_file('private_documents', $filename);
+if ($storedFile === null) {
     http_response_code(404);
     exit('Stored file unavailable.');
 }
 
 $downloadName = str_replace(["\r", "\n", '"'], '', (string)$document['original_name']);
 header('Content-Type: ' . $document['mime_type']);
-header('Content-Length: ' . filesize($file));
+header('Content-Length: ' . strlen($storedFile['contents']));
 header('Content-Disposition: attachment; filename="' . $downloadName . '"');
 header('X-Content-Type-Options: nosniff');
-readfile($file);
+echo $storedFile['contents'];
 exit;
