@@ -112,38 +112,57 @@ function nhre_delete_stored_file(string $directory, string $storedName): void
     }
 }
 
-/** PHP's default session files are per-instance on Vercel; optionally share sessions through MySQL. */
+/** Store sessions in MySQL so they survive serverless or container restarts. */
+final class NhreDatabaseSessionHandler implements SessionHandlerInterface
+{
+    public function open(string $path, string $name): bool
+    {
+        return true;
+    }
+
+    public function close(): bool
+    {
+        return true;
+    }
+
+    public function read(string $id): string|false
+    {
+        $statement = db()->prepare('SELECT session_data FROM nhre_sessions WHERE session_id = ? AND expires_at > NOW()');
+        $statement->execute([$id]);
+        $data = $statement->fetchColumn();
+        return $data === false ? '' : (string)$data;
+    }
+
+    public function write(string $id, string $data): bool
+    {
+        $statement = db()->prepare(
+            'INSERT INTO nhre_sessions (session_id, session_data, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))
+             ON DUPLICATE KEY UPDATE session_data = VALUES(session_data), expires_at = VALUES(expires_at)'
+        );
+        return $statement->execute([$id, $data, SESSION_LIFETIME]);
+    }
+
+    public function destroy(string $id): bool
+    {
+        $statement = db()->prepare('DELETE FROM nhre_sessions WHERE session_id = ?');
+        return $statement->execute([$id]);
+    }
+
+    public function gc(int $maxLifetime): int|false
+    {
+        $statement = db()->prepare('DELETE FROM nhre_sessions WHERE expires_at <= NOW()');
+        return $statement->execute() ? $statement->rowCount() : false;
+    }
+}
+
+/** PHP's default session files are per-instance; optionally share sessions through MySQL. */
 function nhre_configure_sessions(): void
 {
     if (getenv('NHRE_SESSION_STORAGE') !== 'database' || session_status() !== PHP_SESSION_NONE) {
         return;
     }
 
-    session_set_save_handler(
-        static function (string $savePath, string $sessionName): bool { return true; },
-        static function (): bool { return true; },
-        static function (string $id): string|false {
-            $statement = db()->prepare('SELECT session_data FROM nhre_sessions WHERE session_id = ? AND expires_at > NOW()');
-            $statement->execute([$id]);
-            $data = $statement->fetchColumn();
-            return $data === false ? '' : (string)$data;
-        },
-        static function (string $id, string $data): bool {
-            $statement = db()->prepare(
-                'INSERT INTO nhre_sessions (session_id, session_data, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))
-                 ON DUPLICATE KEY UPDATE session_data = VALUES(session_data), expires_at = VALUES(expires_at)'
-            );
-            return $statement->execute([$id, $data, SESSION_LIFETIME]);
-        },
-        static function (string $id): bool {
-            $statement = db()->prepare('DELETE FROM nhre_sessions WHERE session_id = ?');
-            return $statement->execute([$id]);
-        },
-        static function (int $maxLifetime): int|false {
-            $statement = db()->prepare('DELETE FROM nhre_sessions WHERE expires_at <= NOW()');
-            return $statement->execute() ? $statement->rowCount() : false;
-        }
-    );
+    session_set_save_handler(new NhreDatabaseSessionHandler(), true);
 }
 
 function nhre_ensure_deployment_storage_tables(): void

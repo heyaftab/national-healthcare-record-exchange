@@ -10,6 +10,9 @@ RUN docker-php-ext-install pdo_mysql \
     done \
     && a2enmod mpm_prefork rewrite
 
+# Never display PHP warnings or stack traces in public responses.
+RUN printf 'display_errors=Off\nlog_errors=On\n' > /usr/local/etc/php/conf.d/zz-production.ini
+
 WORKDIR /var/www/html
 COPY . /var/www/html
 
