@@ -1,7 +1,13 @@
 FROM php:8.4-apache
 
 RUN docker-php-ext-install pdo_mysql \
-    && (a2dismod mpm_event mpm_worker || true) \
+    && for module in /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf; do \
+        [ -e "$module" ] || continue; \
+        case "$module" in \
+            */mpm_prefork.*) ;; \
+            *) rm -f "$module" ;; \
+        esac; \
+    done \
     && a2enmod mpm_prefork rewrite
 
 WORKDIR /var/www/html
