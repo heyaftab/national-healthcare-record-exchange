@@ -133,14 +133,9 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_booking') {
                 if (!in_array($extension, $allowed, true)) {
                     $errors[] = 'Only PDF, DOC, DOCX, JPG, PNG, or TXT files are allowed.';
                 } else {
-                    $target_dir = __DIR__ . '/../uploads/test_results';
-                    if (!is_dir($target_dir)) {
-                        mkdir($target_dir, 0755, true);
-                    }
-
                     $filename = 'result_' . $booking_id . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
-                    $target_path = $target_dir . '/' . $filename;
-                    if (!move_uploaded_file($tmp_name, $target_path)) {
+                    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp_name) ?: 'application/octet-stream';
+                    if (!nhre_store_uploaded_file($tmp_name, 'test_results', $filename, $mime)) {
                         $errors[] = 'Unable to save the uploaded result file.';
                     } else {
                         $result_file_path = 'uploads/test_results/' . $filename;

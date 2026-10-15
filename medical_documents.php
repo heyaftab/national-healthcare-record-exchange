@@ -39,14 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'Patient') {
         }
 
         if (!$errors) {
-            $dir = __DIR__ . '/uploads/private_documents';
-            if (!is_dir($dir) && !mkdir($dir, 0775, true)) {
-                $errors[] = 'Secure document storage is unavailable.';
-            } else {
-                $stored = bin2hex(random_bytes(20)) . '.' . $allowed[$mime];
-                if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $stored)) {
+            $stored = bin2hex(random_bytes(20)) . '.' . $allowed[$mime];
+            if (!nhre_store_uploaded_file($file['tmp_name'], 'private_documents', $stored, $mime)) {
                     $errors[] = 'Unable to save the document.';
-                } else {
+            } else {
                     $stmt = db()->prepare(
                         'INSERT INTO medical_documents(patient_id, uploaded_by, category, original_name, stored_name, mime_type, file_size, notes, verification_status)
                          VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -55,7 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'Patient') {
                     create_notification($viewer, 'Medical document uploaded', 'Your ' . $category . ' is awaiting verification.', 'medical_document');
                     $_SESSION['success'] = 'Document uploaded securely and is pending verification.';
                     redirect('medical_documents.php');
-                }
             }
         }
     }
