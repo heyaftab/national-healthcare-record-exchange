@@ -19,6 +19,11 @@ $demo_profile_photos = [];
 $demo_account_numbers = [];
 $demo_account_names = [];
 
+foreach ($demo_accounts as &$demoAccount) {
+    $demoAccount['account_number'] = '—';
+}
+unset($demoAccount);
+
 try {
     $emails = array_column($demo_accounts, 'email');
     if ($emails !== []) {
@@ -35,16 +40,16 @@ try {
         }
     }
     foreach ($demo_accounts as &$demoAccount) {
-        $demoAccount['account_number'] = $demo_account_numbers[$demoAccount['email']] ?? '—';
-        $demoAccount['fullname'] = $demo_account_names[$demoAccount['email']] ?? $demoAccount['role'];
+        if (!empty($demo_account_numbers[$demoAccount['email']])) {
+            $demoAccount['account_number'] = $demo_account_numbers[$demoAccount['email']];
+        }
+        if (!empty($demo_account_names[$demoAccount['email']])) {
+            $demoAccount['fullname'] = $demo_account_names[$demoAccount['email']];
+        }
     }
     unset($demoAccount);
 } catch (PDOException $e) {
-    foreach ($demo_accounts as &$demoAccount) {
-        $demoAccount['account_number'] = '—';
-        $demoAccount['fullname'] = $demoAccount['role'];
-    }
-    unset($demoAccount);
+    error_log('Unable to load demo account details: ' . $e->getMessage());
 }
 
 function demo_profile_picture(array $account, array $photos): string
@@ -74,7 +79,7 @@ function demo_profile_picture(array $account, array $photos): string
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="assets/css/styles.css?v=20261003-1">
+  <link rel="stylesheet" href="assets/css/styles.css?v=20261016-2">
 <script>
   (function () {
     try {
@@ -203,12 +208,14 @@ function demo_profile_picture(array $account, array $photos): string
                     <th class="text-end">Action</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody id="moreDoctorAccounts">
                   <?php foreach ($demo_accounts as $account): ?>
                     <tr>
                       <td><img class="demo-account-avatar" src="<?= e(demo_profile_picture($account, $demo_profile_photos)) ?>" alt="Profile picture for <?= e($account['role']) ?> account"></td>
                       <td><span class="badge bg-<?= e($account['badge']) ?>-subtle text-<?= e($account['badge']) ?>-emphasis"><?= e($account['role']) ?></span></td>
-                      <td class="fw-semibold"><?= e($account['fullname'] ?? $account['role']) ?></td>
+                      <td class="fw-semibold">
+                        <?= e($account['fullname']) ?>
+                      </td>
                       <td class="font-monospace"><?= e($account['account_number'] ?? '—') ?></td>
                       <td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm" data-email="<?= e($account['email']) ?>" data-password="<?= e($account['password']) ?>">Use</button></td>
                     </tr>
@@ -240,75 +247,6 @@ function demo_profile_picture(array $account, array $photos): string
         email.focus();
         window.nhreToast && nhreToast('Account credentials filled — you\u2019re ready to log in.');
       });
-    });
-    var doctorAccountsLoaded = false;
-    document.getElementById('toggleDoctorAccounts')?.addEventListener('click', async function () {
-      var expanded = this.getAttribute('aria-expanded') === 'true';
-      if (!doctorAccountsLoaded) {
-        this.disabled = true;
-        this.textContent = 'Loading…';
-        try {
-          var response = await fetch('doctor_demo_accounts.php', { headers: { Accept: 'application/json' } });
-          if (!response.ok) throw new Error('Unable to load doctor accounts.');
-          var accounts = await response.json();
-          var body = document.getElementById('moreDoctorAccounts');
-          accounts.forEach(function (account) {
-            var row = document.createElement('tr');
-            row.className = 'more-doctor-account';
-            row.innerHTML = '<td></td><td><span class="badge bg-info-subtle text-info-emphasis"></span></td><td class="font-monospace"></td><td class="font-monospace">—</td><td class="font-monospace"></td><td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm">Use</button></td>';
-            row.cells[1].firstChild.textContent = account.fullname;
-            row.cells[2].textContent = account.email;
-            row.cells[4].textContent = account.password;
-            var useButton = row.querySelector('.btn-demo-fill');
-            useButton.addEventListener('click', function () {
-              document.getElementById('email').value = account.email;
-              document.getElementById('password').value = account.password;
-              document.getElementById('loginForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
-              document.getElementById('email').focus();
-            });
-            body.appendChild(row);
-          });
-          doctorAccountsLoaded = true;
-        } catch (error) {
-          this.textContent = 'More';
-          window.nhreToast && nhreToast('Doctor accounts could not be loaded.');
-          return;
-        } finally {
-          this.disabled = false;
-        }
-      }
-      document.querySelectorAll('.more-doctor-account').forEach(function (row) {
-        row.classList.toggle('d-none', expanded);
-      });
-      this.setAttribute('aria-expanded', String(!expanded));
-      this.textContent = expanded ? 'More' : 'Hide';
-    });
-    var patientAccountsLoaded = false;
-    document.getElementById('togglePatientAccounts')?.addEventListener('click', async function () {
-      var expanded = this.getAttribute('aria-expanded') === 'true';
-      if (!patientAccountsLoaded) {
-        this.disabled = true; this.textContent = 'Loading…';
-        try {
-          var response = await fetch('patient_demo_accounts.php', { headers: { Accept: 'application/json' } });
-          if (!response.ok) throw new Error('Unable to load patient accounts.');
-          var accounts = await response.json(); var body = document.getElementById('moreDoctorAccounts');
-          accounts.forEach(function (account) {
-            var row = document.createElement('tr'); row.className = 'more-patient-account';
-            row.innerHTML = '<td></td><td><span class="badge bg-primary-subtle text-primary-emphasis">Patient</span></td><td class="font-monospace"></td><td class="font-monospace"></td><td class="font-monospace">Patient123!</td><td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm">Use</button></td>';
-            row.cells[2].textContent = account.email; row.cells[3].textContent = account.account_number;
-            row.querySelector('.btn-demo-fill').addEventListener('click', function () { document.getElementById('email').value = account.email; document.getElementById('password').value = 'Patient123!'; document.getElementById('loginForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
-            body.appendChild(row);
-          }); patientAccountsLoaded = true;
-        } catch (error) { this.textContent = 'More'; return; } finally { this.disabled = false; }
-      }
-      document.querySelectorAll('.more-patient-account').forEach(function (row) { row.classList.toggle('d-none', expanded); });
-      this.setAttribute('aria-expanded', String(!expanded)); this.textContent = expanded ? 'More' : 'Hide';
-    });
-    document.getElementById('toggleLabAccounts')?.addEventListener('click', function () {
-      var expanded = this.getAttribute('aria-expanded') === 'true';
-      document.querySelectorAll('.more-lab-account').forEach(function (row) { row.classList.toggle('d-none', expanded); });
-      this.setAttribute('aria-expanded', String(!expanded));
-      this.textContent = expanded ? 'More' : 'Hide';
     });
 
   </script>

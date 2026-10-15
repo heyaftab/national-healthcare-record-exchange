@@ -2009,6 +2009,10 @@ html[data-theme="dark"] .cta-banner {
   border-radius: 8px;
   font-size: .9rem;
 }
+.auth-form .form-floating > .form-control::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
 .auth-form .form-floating > label {
   height: 58px;
   padding: .95rem .75rem;
@@ -2159,6 +2163,10 @@ html[data-theme="dark"] .cta-banner {
 
 .demo-accounts .table tbody tr:hover {
   transform: translateX(2px);
+}
+
+.demo-accounts .table.table-hover > tbody > tr:hover > * {
+  color: #edf6ff !important;
 }
 
 .demo-account-avatar {
