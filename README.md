@@ -34,8 +34,9 @@
 <br><br>
 
 <a href="https://national-healthcare-record-exchange-production.up.railway.app/">
-  <!-- 📸 Replace with your own screenshot: assets/images/nhre-screenshot.png -->
-  <img src="assets/images/nhre-screenshot.png" alt="NHRE application screenshot" width="94%">
+<img width="1360" height="801" alt="image" src="https://github.com/user-attachments/assets/f0f49dc9-ca5f-4a58-ae7e-0f1493abcdba" />
+
+
 </a>
 
 <sub><b>A first look at NHRE</b> · click the image to open the live demo</sub>
