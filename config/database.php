@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
 
-// Vercel and other hosted environments should provide these as environment
-// variables. The defaults keep the existing XAMPP setup working locally.
+// Hosted environments should provide these as environment variables. The
+// defaults keep the existing XAMPP setup working locally.
 function nhre_env(string $name, string $default): string
 {
     $value = getenv($name);
@@ -28,7 +28,7 @@ const LOGIN_ATTEMPT_WINDOW_MINUTES = 15;
 
 function is_https(): bool
 {
-    // Vercel terminates TLS before forwarding requests to the PHP runtime.
+    // Hosted proxies may terminate TLS before forwarding requests to PHP.
     if (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
         return true;
     }
