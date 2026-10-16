@@ -1,23 +1,21 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f766e,50:0891b2,100:2563eb&height=230&section=header&text=NHRE&fontSize=88&fontColor=ffffff&fontAlignY=36&animation=fadeIn&desc=National%20Healthcare%20Record%20Exchange&descSize=22&descAlignY=58" alt="NHRE banner" width="100%">
-
-<img src="assets/images/nhre-logo.svg" alt="NHRE logo" width="110">
+<img src="assets/images/nhre-banner.svg" alt="NHRE — National Healthcare Record Exchange" width="100%">
 
 <a href="https://national-healthcare-record-exchange-production.up.railway.app/">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1400&color=0891B2&center=true&vCenter=true&width=760&height=48&lines=One+platform.+Six+roles.+Connected+healthcare+workflows.;Patients%2C+Doctors%2C+Pharmacists%2C+Labs+%26+Admins;Consent-based+access+to+health+records;Built+with+PHP+%2B+MySQL.+Deployed+on+Railway." alt="Animated tagline">
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1400&color=19C3C8&center=true&vCenter=true&width=760&height=48&lines=One+platform.+Six+roles.+Connected+healthcare+workflows.;Patients%2C+Doctors%2C+Pharmacists%2C+Labs+%26+Admins;Consent-based+access+to+health+records;Built+with+PHP+%2B+MySQL.+Deployed+on+Railway." alt="Animated tagline">
 </a>
 
 <br>
 
 <a href="https://national-healthcare-record-exchange-production.up.railway.app/">
-  <img src="https://img.shields.io/badge/%F0%9F%9A%80_LIVE_DEMO-OPEN_NHRE-7B3FE4?style=for-the-badge&labelColor=1e1b4b" alt="Open the live demo">
+  <img src="https://img.shields.io/badge/%F0%9F%9A%80_LIVE_DEMO-OPEN_NHRE-1976D2?style=for-the-badge&labelColor=062A45" alt="Open the live demo">
 </a>
 <a href="#-quick-start">
-  <img src="https://img.shields.io/badge/%E2%9A%A1_QUICK_START-RUN_LOCALLY-16a34a?style=for-the-badge&labelColor=052e16" alt="Quick start">
+  <img src="https://img.shields.io/badge/%E2%9A%A1_QUICK_START-RUN_LOCALLY-19C3C8?style=for-the-badge&labelColor=062A45" alt="Quick start">
 </a>
 <a href="#-demo-accounts">
-  <img src="https://img.shields.io/badge/%F0%9F%94%91_DEMO_ACCOUNTS-TRY_A_ROLE-0891b2?style=for-the-badge&labelColor=083344" alt="Demo accounts">
+  <img src="https://img.shields.io/badge/%F0%9F%94%91_DEMO_ACCOUNTS-TRY_A_ROLE-008F91?style=for-the-badge&labelColor=062A45" alt="Demo accounts">
 </a>
 
 <br><br>
@@ -34,9 +32,7 @@
 <br><br>
 
 <a href="https://national-healthcare-record-exchange-production.up.railway.app/">
-<img width="1360" height="801" alt="image" src="https://github.com/user-attachments/assets/f0f49dc9-ca5f-4a58-ae7e-0f1493abcdba" />
-
-
+  <img width="1360" height="801" alt="NHRE dashboard screenshot" src="https://github.com/user-attachments/assets/f0f49dc9-ca5f-4a58-ae7e-0f1493abcdba" />
 </a>
 
 <sub><b>A first look at NHRE</b> · click the image to open the live demo</sub>
@@ -63,7 +59,7 @@
 >
 > NHRE is a demonstration prototype, not a certified medical records system. Do not use it with real patient data without appropriate security, privacy, regulatory, and clinical review.
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## ✨ Overview
 
@@ -84,7 +80,7 @@ Each account is tied to a role, and the interface and available actions change a
 
 </div>
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 🧩 Key features
 
@@ -133,7 +129,7 @@ Each account is tied to a role, and the interface and available actions change a
   </tr>
 </table>
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 👥 Role-based workspaces
 
@@ -181,15 +177,15 @@ flowchart TB
     App --> HospitalAdmin["🏥 Hospital<br>Administrator"]
     App --> SystemAdmin["🛡️ System<br>Administrator"]
 
-    classDef core fill:#0f766e,stroke:#134e4a,color:#ffffff,stroke-width:2px;
-    classDef care fill:#e0f2fe,stroke:#0891b2,color:#0c4a6e,stroke-width:1.5px;
-    classDef ops fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:1.5px;
+    classDef core fill:#062A45,stroke:#19C3C8,color:#ffffff,stroke-width:2px;
+    classDef care fill:#e0f7fa,stroke:#19C3C8,color:#062A45,stroke-width:1.5px;
+    classDef ops fill:#e3f0fc,stroke:#1976D2,color:#062A45,stroke-width:1.5px;
     class App core;
     class Patient,Doctor,Lab care;
     class Pharmacist,HospitalAdmin,SystemAdmin ops;
 ```
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 📐 Architecture
 
@@ -204,15 +200,15 @@ flowchart LR
     Files --> Local["💾 Local uploads<br>directory"]
     Files --> Stored["🗃️ Optional database-<br>backed file storage"]
 
-    classDef client fill:#e0f2fe,stroke:#0891b2,color:#0c4a6e,stroke-width:1.5px;
-    classDef app fill:#0f766e,stroke:#134e4a,color:#ffffff,stroke-width:2px;
-    classDef data fill:#ede9fe,stroke:#7c3aed,color:#3b0764,stroke-width:1.5px;
+    classDef client fill:#e0f7fa,stroke:#19C3C8,color:#062A45,stroke-width:1.5px;
+    classDef app fill:#062A45,stroke:#19C3C8,color:#ffffff,stroke-width:2px;
+    classDef data fill:#e3f0fc,stroke:#1976D2,color:#062A45,stroke-width:1.5px;
     class Browser client;
     class Web app;
     class DB,Files,Local,Stored data;
 ```
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 🧰 Technology stack
 
@@ -245,7 +241,7 @@ flowchart LR
 | Hosted deployment | Railway |
 | Interface | HTML, CSS, JavaScript, Bootstrap 5, and Font Awesome |
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 📁 Project structure
 
@@ -264,7 +260,7 @@ flowchart LR
 └── README.md
 ```
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 📋 Requirements
 
@@ -273,7 +269,7 @@ flowchart LR
 - ✅ Apache (XAMPP is supported) or PHP's built-in development server
 - ✅ Docker when building or running the provided container
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## ⚡ Quick start
 
@@ -313,7 +309,7 @@ Place the repository in the Apache web root, start Apache and MySQL, and open th
 
 </details>
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 🔧 Configuration
 
@@ -332,7 +328,7 @@ The application reads database connection settings from environment variables. P
 > [!NOTE]
 > When database-backed storage is enabled, the application creates the `nhre_sessions` and `nhre_file_storage` support tables. The configured database user must have permission to create them.
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 🔑 Demo accounts
 
@@ -357,14 +353,14 @@ The login page provisions and displays demo accounts. Try the **[live demo](http
 > [!CAUTION]
 > These are public demonstration credentials. Do not expose a deployment with demo accounts or default credentials to real users or real patient data.
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 🚂 Railway deployment
 
 <div align="center">
 
 <a href="https://national-healthcare-record-exchange-production.up.railway.app/">
-  <img src="https://img.shields.io/badge/%F0%9F%9F%A2_LIVE_NOW-national--healthcare--record--exchange-7B3FE4?style=for-the-badge&logo=railway&logoColor=white&labelColor=1e1b4b" alt="Live on Railway">
+  <img src="https://img.shields.io/badge/%F0%9F%9F%A2_LIVE_NOW-national--healthcare--record--exchange-1976D2?style=for-the-badge&logo=railway&logoColor=white&labelColor=062A45" alt="Live on Railway">
 </a>
 
 </div>
@@ -378,7 +374,7 @@ The repository includes a [Dockerfile](Dockerfile) for deploying the PHP applica
 3. In the app service's Variables settings, map `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` to the MySQL service's `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, and `MYSQLPASSWORD` variables. Set `NHRE_SESSION_STORAGE=database` and `NHRE_FILE_STORAGE=database` so sessions and uploads persist in MySQL.
 4. Apply the variables and deploy. Open the app's public domain and verify `/` and `/login.php`.
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 🔒 Security notes
 
@@ -389,7 +385,7 @@ The repository includes a [Dockerfile](Dockerfile) for deploying the PHP applica
 - Password-reset flows are for demonstration and do not replace verified email delivery.
 - Uploaded files and database contents may include sensitive information; secure, validate, and manage them appropriately.
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,14,18&height=3&section=header" width="100%" alt="">
+<img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 
 ## 📄 License
 
@@ -402,9 +398,9 @@ This project is licensed under the [MIT License](LICENSE).
 **If NHRE caught your eye, consider leaving a ⭐ on the repo!**
 
 <a href="https://national-healthcare-record-exchange-production.up.railway.app/">
-  <img src="https://img.shields.io/badge/%F0%9F%9A%80_Try_the_live_demo-7B3FE4?style=for-the-badge&labelColor=1e1b4b" alt="Try the live demo">
+  <img src="https://img.shields.io/badge/%F0%9F%9A%80_Try_the_live_demo-1976D2?style=for-the-badge&labelColor=062A45" alt="Try the live demo">
 </a>
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:2563eb,50:0891b2,100:0f766e&height=140&section=footer" alt="" width="100%">
-
 </div>
+
+<img src="assets/images/nhre-footer.svg" width="100%" alt="">
