@@ -7,6 +7,54 @@
     if (modal.parentElement !== document.body) document.body.appendChild(modal);
   });
 
+  /* ---------- Profile photo preview ---------- */
+  const profilePhotoInput = document.getElementById('profile_photo');
+  const profilePhotoPreview = document.getElementById('profilePhotoPreview');
+  const removeProfilePhoto = document.getElementById('removeProfilePhoto');
+  const profilePhotoStatus = document.getElementById('profilePhotoStatus');
+  if (profilePhotoInput && profilePhotoPreview && removeProfilePhoto) {
+    const originalPhoto = profilePhotoPreview.dataset.originalSrc;
+    let previewUrl = null;
+
+    const clearPhotoSelection = () => {
+      profilePhotoInput.value = '';
+      profilePhotoPreview.src = originalPhoto;
+      removeProfilePhoto.hidden = true;
+      if (profilePhotoStatus) profilePhotoStatus.textContent = '';
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
+    };
+
+    profilePhotoInput.addEventListener('change', () => {
+      const file = profilePhotoInput.files?.[0];
+      if (!file) {
+        clearPhotoSelection();
+        return;
+      }
+
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+      if (!allowedTypes.includes(file.type) || file.size > 2 * 1024 * 1024) {
+        clearPhotoSelection();
+        if (profilePhotoStatus) {
+          profilePhotoStatus.textContent = file.size > 2 * 1024 * 1024
+            ? 'Choose an image that is 2 MB or smaller.'
+            : 'Choose a PNG, JPG, WEBP, or GIF image.';
+        }
+        return;
+      }
+
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      profilePhotoPreview.src = previewUrl;
+      removeProfilePhoto.hidden = false;
+      if (profilePhotoStatus) profilePhotoStatus.textContent = `${file.name} selected. Save changes to update your profile photo.`;
+    });
+
+    removeProfilePhoto.addEventListener('click', clearPhotoSelection);
+  }
+
   /* ---------- Authenticated sidebar ---------- */
   const sidebar = document.getElementById('nhreSidebar');
   if (sidebar) {
@@ -559,25 +607,4 @@
     });
   });
 
-  /* ---------- Smooth page transitions ---------- */
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    document.querySelectorAll('a[href]').forEach((link) => {
-      link.addEventListener('click', (event) => {
-        const href = link.getAttribute('href');
-        const isInternal = href && !href.startsWith('#') && !href.startsWith('http') && !href.startsWith('mailto:') && !href.startsWith('tel:');
-        if (!isInternal || link.target === '_blank' || link.hasAttribute('download') || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-        event.preventDefault();
-        document.body.classList.add('page-leaving');
-        window.setTimeout(() => { window.location.href = href; }, 180);
-      });
-    });
-  }
-
-  /* ---------- Reset transition state when restored from bfcache ---------- */
-  window.addEventListener('pageshow', (event) => {
-    if (event.persisted) {
-      document.body.classList.remove('page-leaving');
-    }
-  });
 })();

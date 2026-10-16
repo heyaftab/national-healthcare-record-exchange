@@ -180,7 +180,7 @@ function render_profile_value(mixed $value): string
               <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
               <div class="profile-photo-card">
                 <div class="profile-photo-preview">
-                  <img src="<?= e($resolved_avatar) ?>" alt="Current profile photo">
+                  <img src="<?= e($resolved_avatar) ?>" alt="Current profile photo" id="profilePhotoPreview" data-original-src="<?= e($resolved_avatar) ?>">
                 </div>
                 <div>
                   <label for="profile_photo" class="btn btn-auth-primary ripple">
@@ -188,7 +188,9 @@ function render_profile_value(mixed $value): string
                     <span>Choose photo</span>
                   </label>
                   <input type="file" id="profile_photo" name="profile_photo" class="d-none" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif">
+                  <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="removeProfilePhoto" hidden>Undo photo selection</button>
                   <div class="form-text mt-2">PNG, JPG, WEBP, or GIF up to 2 MB.</div>
+                  <div class="form-text" id="profilePhotoStatus" aria-live="polite"></div>
                 </div>
               </div>
               <div class="row g-3">
@@ -307,6 +309,6 @@ function render_profile_value(mixed $value): string
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="assets/js/app.js?v=20260818-10"></script>
+  <script src="assets/js/app.js?v=20261016-4"></script>
 </body>
 </html>

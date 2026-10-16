@@ -250,7 +250,7 @@ try {
       </section>
     </main>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="assets/js/app.js?v=20260811-8"></script>
+<script src="assets/js/app.js?v=20261016-3"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const currentUrl = new URL(window.location.href);

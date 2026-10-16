@@ -212,10 +212,16 @@ function remember_me_login(): void
 
 function unread_notification_count(int $user_id): int
 {
+    static $counts = [];
+    if (array_key_exists($user_id, $counts)) {
+        return $counts[$user_id];
+    }
+
     try {
         $stmt = db()->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
         $stmt->execute([$user_id]);
-        return (int)$stmt->fetchColumn();
+        $counts[$user_id] = (int)$stmt->fetchColumn();
+        return $counts[$user_id];
     } catch (PDOException $e) {
         return 0;
     }

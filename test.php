@@ -70,6 +70,6 @@ $results['Session started'] = session_status() === PHP_SESSION_ACTIVE ? 'Yes' : 
       </div>
     </section>
   </main>
-  <script src="assets/js/app.js?v=20260811-8"></script>
+  <script src="assets/js/app.js?v=20261016-3"></script>
 </body>
 </html>

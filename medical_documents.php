@@ -143,6 +143,6 @@ $documents = $stmt->fetchAll();
     </article>
   </section>
 </main>
-<script src="assets/js/app.js?v=20260818-10"></script>
+<script src="assets/js/app.js?v=20261016-3"></script>
 </body>
 </html>
