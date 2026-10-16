@@ -1054,7 +1054,6 @@ function ensure_doctor_catalog_tables(): void
 
         }
 
-        ensure_demo_accounts();
         ensure_realistic_patient_population();
         ensure_realistic_demo_appointments();
         ensure_seeded_doctor_credentials();
@@ -1120,7 +1119,6 @@ function ensure_realistic_demo_appointments(): void
 
     try {
         ensure_appointments_table_exists();
-        ensure_demo_accounts();
         assign_missing_account_numbers();
 
         $pdo = db();
@@ -1251,7 +1249,6 @@ function ensure_realistic_exchange_data(): void
 
     try {
         ensure_access_tables_exists();
-        ensure_demo_accounts();
         ensure_doctor_catalog_tables();
         ensure_missing_user_districts();
 
@@ -1700,49 +1697,46 @@ function default_patient_id_for_demo_seed(): ?int
 
 function ensure_unique_user_identity_data(): void
 {
-    try {
-        $pdo = db();
-        $rows = $pdo->query('SELECT id, email, phone, nid FROM users ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
-        $seenEmails = [];
-        $seenPhones = [];
-        $seenNids = [];
+    $pdo = db();
+    $rows = $pdo->query('SELECT id, email, phone, nid FROM users ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $seenEmails = [];
+    $seenPhones = [];
+    $seenNids = [];
 
-        foreach ($rows as $row) {
-            $id = (int)($row['id'] ?? 0);
-            if ($id <= 0) {
-                continue;
-            }
-
-            $email = strtolower(trim((string)($row['email'] ?? '')));
-            if ($email !== '' && isset($seenEmails[$email])) {
-                $email = 'user' . $id . '@nhre.local';
-                $pdo->prepare('UPDATE users SET email = ? WHERE id = ?')->execute([$email, $id]);
-            }
-            $seenEmails[$email] = true;
-
-            $phone = trim((string)($row['phone'] ?? ''));
-            $candidatePhone = $phone;
-            $counter = 1;
-            while ($candidatePhone !== '' && isset($seenPhones[$candidatePhone])) {
-                $candidatePhone = '+88017' . str_pad((string)(30000000 + $id + $counter), 8, '0', STR_PAD_LEFT);
-                $counter++;
-            }
-            if ($candidatePhone !== $phone && $candidatePhone !== '') {
-                $pdo->prepare('UPDATE users SET phone = ? WHERE id = ?')->execute([$candidatePhone, $id]);
-            }
-            $seenPhones[$candidatePhone !== '' ? $candidatePhone : $phone] = true;
-
-            $nid = trim((string)($row['nid'] ?? ''));
-            if ($nid !== '' && isset($seenNids[$nid])) {
-                $replacement = (string)(9000000000 + $id + 1000000);
-                $pdo->prepare('UPDATE users SET nid = ? WHERE id = ?')->execute([$replacement, $id]);
-                $nid = $replacement;
-            }
-            if ($nid !== '') {
-                $seenNids[$nid] = true;
-            }
+    foreach ($rows as $row) {
+        $id = (int)($row['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
         }
-    } catch (PDOException $e) {
+
+        $email = strtolower(trim((string)($row['email'] ?? '')));
+        if ($email !== '' && isset($seenEmails[$email])) {
+            $email = 'user' . $id . '@nhre.local';
+            $pdo->prepare('UPDATE users SET email = ? WHERE id = ?')->execute([$email, $id]);
+        }
+        $seenEmails[$email] = true;
+
+        $phone = trim((string)($row['phone'] ?? ''));
+        $candidatePhone = $phone;
+        $counter = 1;
+        while ($candidatePhone !== '' && isset($seenPhones[$candidatePhone])) {
+            $candidatePhone = '+88017' . str_pad((string)(30000000 + $id + $counter), 8, '0', STR_PAD_LEFT);
+            $counter++;
+        }
+        if ($candidatePhone !== $phone && $candidatePhone !== '') {
+            $pdo->prepare('UPDATE users SET phone = ? WHERE id = ?')->execute([$candidatePhone, $id]);
+        }
+        $seenPhones[$candidatePhone !== '' ? $candidatePhone : $phone] = true;
+
+        $nid = trim((string)($row['nid'] ?? ''));
+        if ($nid !== '' && isset($seenNids[$nid])) {
+            $replacement = (string)(9000000000 + $id + 1000000);
+            $pdo->prepare('UPDATE users SET nid = ? WHERE id = ?')->execute([$replacement, $id]);
+            $nid = $replacement;
+        }
+        if ($nid !== '') {
+            $seenNids[$nid] = true;
+        }
     }
 }
 
@@ -1754,10 +1748,7 @@ function ensure_demo_accounts(): void
     }
     $done = true;
 
-    try {
-        ensure_unique_user_identity_data();
-    } catch (PDOException $e) {
-    }
+    ensure_unique_user_identity_data();
     $accounts = [
         ['Demo Patient',          '0000000001', 'patient@nhre.gov', '+8801000000001', 'Patient123!', 'Patient'],
         ['Dr. Afsana Ahmed',      '10000000001', 'doctor001@nhre.dev', '+8801710000001', 'Doctor123!', 'Doctor'],
@@ -1797,39 +1788,36 @@ function ensure_demo_accounts(): void
         ['Maksudul Islam',           '0000000005', 'lab@nhre.gov', '+8801710002005', 'Lab123!', 'Lab Technician'],
     ];
 
-    try {
-        $pdo = db();
-        $find = $pdo->prepare('SELECT id, fullname, email, phone, nid FROM users WHERE email = ? OR phone = ? OR nid = ? LIMIT 1');
-        $update = $pdo->prepare('UPDATE users SET fullname = ?, role = ?, nid = ?, phone = ?, password_hash = ? WHERE email = ? LIMIT 1');
-        $insert = $pdo->prepare(
-            'INSERT INTO users (fullname, nid, email, phone, password_hash, role)
-             VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        foreach ($accounts as $account) {
-            [$fullname, $nid, $email, $phone, $password, $role] = $account;
-            $find->execute([$email, $phone, $nid]);
-            $existing = $find->fetch(PDO::FETCH_ASSOC);
+    $pdo = db();
+    $find = $pdo->prepare('SELECT id, fullname, email, phone, nid FROM users WHERE email = ? OR phone = ? OR nid = ? LIMIT 1');
+    $update = $pdo->prepare('UPDATE users SET fullname = ?, role = ?, nid = ?, phone = ?, password_hash = ? WHERE email = ? LIMIT 1');
+    $insert = $pdo->prepare(
+        'INSERT INTO users (fullname, nid, email, phone, password_hash, role)
+         VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    foreach ($accounts as $account) {
+        [$fullname, $nid, $email, $phone, $password, $role] = $account;
+        $find->execute([$email, $phone, $nid]);
+        $existing = $find->fetch(PDO::FETCH_ASSOC);
 
-            if ($existing) {
-                $sameEmail = strtolower((string)($existing['email'] ?? '')) === strtolower($email);
-                if ($sameEmail) {
-                    $update->execute([$fullname, $role, $nid, $phone, password_hash($password, PASSWORD_DEFAULT), $email]);
-                }
-                continue;
+        if ($existing) {
+            $sameEmail = strtolower((string)($existing['email'] ?? '')) === strtolower($email);
+            if ($sameEmail) {
+                $update->execute([$fullname, $role, $nid, $phone, password_hash($password, PASSWORD_DEFAULT), $email]);
             }
-
-            $insert->execute([
-                $fullname,
-                $nid,
-                $email,
-                $phone,
-                password_hash($password, PASSWORD_DEFAULT),
-                $role,
-            ]);
+            continue;
         }
-        assign_missing_account_numbers();
-    } catch (PDOException $e) {
+
+        $insert->execute([
+            $fullname,
+            $nid,
+            $email,
+            $phone,
+            password_hash($password, PASSWORD_DEFAULT),
+            $role,
+        ]);
     }
+    assign_missing_account_numbers();
 }
 
 function get_doctor_time_slots(int $doctor_id, ?string $appointment_date = null, ?string $visiting_hours = null): array
@@ -2076,7 +2064,6 @@ function vaccination_names(): array
 
 function ensure_vaccination_center_tables(): void
 {
-    ensure_demo_accounts();
     db()->exec(
         'CREATE TABLE IF NOT EXISTS `vaccination_centers` (
           `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,

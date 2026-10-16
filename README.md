@@ -253,6 +253,7 @@ flowchart LR
 ├── database/
 │   └── nhre.sql            # Initial schema and seed data
 ├── includes/               # Shared navigation and pharmacy helpers
+├── scripts/                # Explicit command-line setup tasks
 ├── uploads/                # Local upload storage
 ├── Dockerfile              # Apache/PHP container for Railway
 ├── .env.example            # Hosted environment-variable names
@@ -285,6 +286,17 @@ mysql -u root < database/nhre.sql
 ```
 
 Alternatively, import `database/nhre.sql` using phpMyAdmin.
+
+To create the demo accounts shown on the login page, run the seeder once after
+the database has been imported:
+
+```bash
+php scripts/seed_demo_accounts.php
+```
+
+For a hosted deployment, run this command once with the app's database
+environment variables configured (for example, from a deployment shell).
+Do not add it to the web request or the container startup command.
 
 ### 2️⃣ Check local database settings
 
@@ -332,7 +344,7 @@ The application reads database connection settings from environment variables. P
 
 ## 🔑 Demo accounts
 
-The login page provisions and displays demo accounts. Try the **[live demo](https://national-healthcare-record-exchange-production.up.railway.app/)** with any of these seeded credentials:
+The login page displays demo accounts that must be seeded once during setup with `php scripts/seed_demo_accounts.php`. Try the **[live demo](https://national-healthcare-record-exchange-production.up.railway.app/)** with any of these credentials:
 
 <details open>
 <summary><b>👇 Seeded credentials (click to collapse)</b></summary>

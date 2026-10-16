@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/auth/auth_check.php';
-ensure_demo_accounts();
 redirect_if_authenticated();
 
 $errors = session_pull('errors', []);
