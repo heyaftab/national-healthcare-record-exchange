@@ -467,9 +467,9 @@ function ensure_named_patient_test_accounts(): void
     try {
         $pdo = db();
         $accounts = [
-            ['Farhana Rahman', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Female', 'House 12, Road 3, Dhanmondi', '1994-03-12', '9000005101', 'Teacher'],
-            ['Arif Hossain', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Male', 'House 21, Road 7, Gulshan', '1988-09-21', '9000005102', 'Software Engineer'],
-            ['Nadia Islam', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Female', 'House 7, Road 5, Uttara', '2001-11-04', '9000005103', 'Student'],
+            ['Farhana Rahman', 'patient@nhre.gov', '+8801710001001', 'Female', 'House 12, Road 3, Dhanmondi', '1994-03-12', '9000005101', 'Teacher'],
+            ['Arif Hossain', 'patient002@nhre.demo', '+8801710001002', 'Male', 'House 21, Road 7, Gulshan', '1988-09-21', '9000005102', 'Software Engineer'],
+            ['Nadia Islam', 'patient003@nhre.demo', '+8801710001003', 'Female', 'House 7, Road 5, Uttara', '2001-11-04', '9000005103', 'Student'],
         ];
 
         $check = $pdo->prepare('SELECT id FROM users WHERE email = ? AND role = ? LIMIT 1');
@@ -479,7 +479,7 @@ function ensure_named_patient_test_accounts(): void
         );
 
         foreach ($accounts as $index => $account) {
-            [$fullname, $email, $phone, $password, $gender, $address, $dob, $nid, $occupation] = $account;
+            [$fullname, $email, $phone, $gender, $address, $dob, $nid, $occupation] = $account;
             $check->execute([$email, 'Patient']);
             if ($check->fetch()) {
                 continue;
@@ -491,7 +491,7 @@ function ensure_named_patient_test_accounts(): void
                 $nid,
                 $email,
                 $phone,
-                password_hash($password, PASSWORD_DEFAULT),
+                password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
                 'Patient',
                 $gender,
                 $address,
@@ -564,7 +564,7 @@ function ensure_realistic_patient_population(string $profileKey = 'dhaka_tertiar
                 $nid,
                 $email,
                 $phone,
-                password_hash('Patient123!', PASSWORD_DEFAULT),
+                password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
                 'Patient',
                 $gender,
                 $address,
@@ -1030,7 +1030,7 @@ function ensure_doctor_catalog_tables(): void
                     '100000000' . str_pad((string)$index, 2, '0', STR_PAD_LEFT),
                     'doctor' . str_pad((string)$index, 3, '0', STR_PAD_LEFT) . '@nhre.dev',
                     '+88017' . str_pad((string)(10000000 + $index), 8, '0', STR_PAD_LEFT),
-                    password_hash('Doctor123!', PASSWORD_DEFAULT),
+                    password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
                     'Doctor',
                     $gender,
                     $district['name'] . ' Medical Center',
@@ -1633,10 +1633,7 @@ function ensure_demo_patients_and_records(): void
     return;
 }
 
-/**
- * Give every generated doctor account an individual demo password.  Existing
- * accounts are migrated only when they still use the former shared password.
- */
+/** Rotate generated doctors to random passwords, retaining the configured primary demo password. */
 function ensure_seeded_doctor_credentials(): void
 {
     try {
@@ -1647,17 +1644,31 @@ function ensure_seeded_doctor_credentials(): void
             PRIMARY KEY (`setting_key`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
         $completed = $pdo->prepare('SELECT 1 FROM application_settings WHERE setting_key = ? LIMIT 1');
-        $completed->execute(['seeded_doctor_credentials_v1']);
+        $completed->execute(['seeded_doctor_credentials_v2']);
         if ($completed->fetchColumn()) {
             return;
         }
 
-        $pdo->prepare('UPDATE users SET password_hash = ? WHERE role = ? AND email LIKE ?')
-            ->execute([password_hash('Doctor123!', PASSWORD_DEFAULT), 'Doctor', 'doctor%@nhre.dev']);
+        $doctorEmails = $pdo->query("SELECT email FROM users WHERE role = 'Doctor' AND email LIKE 'doctor%@nhre.dev'")
+            ->fetchAll(PDO::FETCH_COLUMN);
+        $update = $pdo->prepare('UPDATE users SET password_hash = ? WHERE email = ? AND role = ?');
+        $demoPassword = getenv('NHRE_DEMO_PASSWORD');
+        foreach ($doctorEmails as $email) {
+            if (preg_match('/^doctor\\d{3}@nhre\\.dev$/', (string)$email)) {
+                $password = $email === 'doctor001@nhre.dev' && $demoPassword !== false && strlen($demoPassword) >= 16
+                    ? $demoPassword
+                    : bin2hex(random_bytes(32));
+                $update->execute([
+                    password_hash($password, PASSWORD_DEFAULT),
+                    $email,
+                    'Doctor',
+                ]);
+            }
+        }
 
         $pdo->prepare('INSERT INTO application_settings (setting_key, setting_value) VALUES (?, ?)
             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)')->execute([
-                'seeded_doctor_credentials_v1',
+                'seeded_doctor_credentials_v2',
                 date('c'),
             ]);
     } catch (PDOException $e) {
@@ -1665,12 +1676,7 @@ function ensure_seeded_doctor_credentials(): void
 }
 
 
-/**
- * Idempotently seed one demo account for every role that cannot self-register
- * (Pharmacist and Lab Technician already can self-register; these just provide
- * ready-made demo credentials). Passwords match the defaults shown on the login
- * page and in the README demo accounts table.
- */
+/** Find a patient account to associate with demonstration records. */
 function default_patient_id_for_demo_seed(): ?int
 {
     try {
@@ -1746,46 +1752,50 @@ function ensure_demo_accounts(): void
     if ($done) {
         return;
     }
+    $demoPassword = getenv('NHRE_DEMO_PASSWORD');
+    if ($demoPassword === false || strlen($demoPassword) < 16) {
+        throw new RuntimeException('Set NHRE_DEMO_PASSWORD to a private value of at least 16 characters before seeding demo accounts.');
+    }
     $done = true;
 
     ensure_unique_user_identity_data();
     $accounts = [
-        ['Demo Patient',          '0000000001', 'patient@nhre.gov', '+8801000000001', 'Patient123!', 'Patient'],
-        ['Dr. Afsana Ahmed',      '10000000001', 'doctor001@nhre.dev', '+8801710000001', 'Doctor123!', 'Doctor'],
-        ['Hospital Administrator', '0000000002', 'admin@nhre.gov', '+8801000000002', 'Admin123!', 'Hospital Admin'],
-        ['System Administrator',   '0000000003', 'sysadmin@nhre.gov', '+8801000000003', 'SysAdmin123!', 'System Admin'],
-        ['Demo Pharmacist',        '0000000004', 'pharmacist@nhre.gov', '+8801000000004', 'Pharmacist123!', 'Pharmacist'],
-        ['Demo Lab Technician',    '0000000005', 'lab@nhre.gov', '+8801000000005', 'Lab123!', 'Lab Technician'],
-        ['Nusrat Jahan',           '0000000006', 'nusrat.jahan.lab@nhre.gov', '+8801712345606', 'LabTech123!', 'Lab Technician'],
-        ['Farhana Rahman', '1000000001', 'patient@nhre.gov', '+8801710001001', 'Patient123!', 'Patient'],
-        ['Arif Hossain', '1000000002', 'patient002@nhre.demo', '+8801710001002', 'Patient123!', 'Patient'],
-        ['Nadia Islam', '1000000003', 'patient003@nhre.demo', '+8801710001003', 'Patient123!', 'Patient'],
-        ['Sami Ahmed', '1000000004', 'patient004@nhre.demo', '+8801710001004', 'Patient123!', 'Patient'],
-        ['Mariam Sultana', '1000000005', 'patient005@nhre.demo', '+8801710001005', 'Patient123!', 'Patient'],
-        ['Kabir Rahman', '1000000006', 'patient006@nhre.demo', '+8801710001006', 'Patient123!', 'Patient'],
-        ['Ayesha Karim', '1000000007', 'patient007@nhre.demo', '+8801710001007', 'Patient123!', 'Patient'],
-        ['Rafi Chowdhury', '1000000008', 'patient008@nhre.demo', '+8801710001008', 'Patient123!', 'Patient'],
-        ['Tasnim Akter', '1000000009', 'patient009@nhre.demo', '+8801710001009', 'Patient123!', 'Patient'],
-        ['Imran Hasan', '1000000010', 'patient010@nhre.demo', '+8801710001010', 'Patient123!', 'Patient'],
-        ['Nusrat Jahan', '1000000011', 'patient011@nhre.demo', '+8801710001011', 'Patient123!', 'Patient'],
-        ['Mahmud Hossain', '1000000012', 'patient012@nhre.demo', '+8801710001012', 'Patient123!', 'Patient'],
-        ['Faria Ahmed', '1000000013', 'patient013@nhre.demo', '+8801710001013', 'Patient123!', 'Patient'],
-        ['Tahmid Islam', '1000000014', 'patient014@nhre.demo', '+8801710001014', 'Patient123!', 'Patient'],
-        ['Sadia Rahman', '1000000015', 'patient015@nhre.demo', '+8801710001015', 'Patient123!', 'Patient'],
-        ['Nabil Karim', '1000000016', 'patient016@nhre.demo', '+8801710001016', 'Patient123!', 'Patient'],
-        ['Lamia Hossain', '1000000017', 'patient017@nhre.demo', '+8801710001017', 'Patient123!', 'Patient'],
-        ['Asif Mahmood', '1000000018', 'patient018@nhre.demo', '+8801710001018', 'Patient123!', 'Patient'],
-        ['Mehnaz Chowdhury', '1000000019', 'patient019@nhre.demo', '+8801710001019', 'Patient123!', 'Patient'],
-        ['Rakib Ahmed', '1000000020', 'patient020@nhre.demo', '+8801710001020', 'Patient123!', 'Patient'],
-        ['Jannat Sultana', '1000000021', 'patient021@nhre.demo', '+8801710001021', 'Patient123!', 'Patient'],
-        ['Ahsan Talukder', '1000000022', 'patient022@nhre.demo', '+8801710001022', 'Patient123!', 'Patient'],
-        ['Farzana Begum', '1000000023', 'patient023@nhre.demo', '+8801710001023', 'Patient123!', 'Patient'],
-        ['Maruf Islam', '1000000024', 'patient024@nhre.demo', '+8801710001024', 'Patient123!', 'Patient'],
-        ['Zarin Noor', '1000000025', 'patient025@nhre.demo', '+8801710001025', 'Patient123!', 'Patient'],
-        ['Dr. Mohammad Ashraf Karim', '0000000002', 'admin@nhre.gov', '+8801710002002', 'Admin123!', 'Hospital Admin'],
-        ['Nusrat Jahan Chowdhury',   '0000000003', 'sysadmin@nhre.gov', '+8801710002003', 'SysAdmin123!', 'System Admin'],
-        ['Ahsanul Haque',            '0000000004', 'pharmacist@nhre.gov', '+8801710002004', 'Pharmacist123!', 'Pharmacist'],
-        ['Maksudul Islam',           '0000000005', 'lab@nhre.gov', '+8801710002005', 'Lab123!', 'Lab Technician'],
+        ['Demo Patient',          '0000000001', 'patient@nhre.gov', '+8801000000001', $demoPassword, 'Patient'],
+        ['Dr. Afsana Ahmed',      '10000000001', 'doctor001@nhre.dev', '+8801710000001', $demoPassword, 'Doctor'],
+        ['Hospital Administrator', '0000000002', 'admin@nhre.gov', '+8801000000002', $demoPassword, 'Hospital Admin'],
+        ['System Administrator',   '0000000003', 'sysadmin@nhre.gov', '+8801000000003', $demoPassword, 'System Admin'],
+        ['Demo Pharmacist',        '0000000004', 'pharmacist@nhre.gov', '+8801000000004', $demoPassword, 'Pharmacist'],
+        ['Demo Lab Technician',    '0000000005', 'lab@nhre.gov', '+8801000000005', $demoPassword, 'Lab Technician'],
+        ['Nusrat Jahan',           '0000000006', 'nusrat.jahan.lab@nhre.gov', '+8801712345606', $demoPassword, 'Lab Technician'],
+        ['Farhana Rahman', '1000000001', 'patient@nhre.gov', '+8801710001001', $demoPassword, 'Patient'],
+        ['Arif Hossain', '1000000002', 'patient002@nhre.demo', '+8801710001002', $demoPassword, 'Patient'],
+        ['Nadia Islam', '1000000003', 'patient003@nhre.demo', '+8801710001003', $demoPassword, 'Patient'],
+        ['Sami Ahmed', '1000000004', 'patient004@nhre.demo', '+8801710001004', $demoPassword, 'Patient'],
+        ['Mariam Sultana', '1000000005', 'patient005@nhre.demo', '+8801710001005', $demoPassword, 'Patient'],
+        ['Kabir Rahman', '1000000006', 'patient006@nhre.demo', '+8801710001006', $demoPassword, 'Patient'],
+        ['Ayesha Karim', '1000000007', 'patient007@nhre.demo', '+8801710001007', $demoPassword, 'Patient'],
+        ['Rafi Chowdhury', '1000000008', 'patient008@nhre.demo', '+8801710001008', $demoPassword, 'Patient'],
+        ['Tasnim Akter', '1000000009', 'patient009@nhre.demo', '+8801710001009', $demoPassword, 'Patient'],
+        ['Imran Hasan', '1000000010', 'patient010@nhre.demo', '+8801710001010', $demoPassword, 'Patient'],
+        ['Nusrat Jahan', '1000000011', 'patient011@nhre.demo', '+8801710001011', $demoPassword, 'Patient'],
+        ['Mahmud Hossain', '1000000012', 'patient012@nhre.demo', '+8801710001012', $demoPassword, 'Patient'],
+        ['Faria Ahmed', '1000000013', 'patient013@nhre.demo', '+8801710001013', $demoPassword, 'Patient'],
+        ['Tahmid Islam', '1000000014', 'patient014@nhre.demo', '+8801710001014', $demoPassword, 'Patient'],
+        ['Sadia Rahman', '1000000015', 'patient015@nhre.demo', '+8801710001015', $demoPassword, 'Patient'],
+        ['Nabil Karim', '1000000016', 'patient016@nhre.demo', '+8801710001016', $demoPassword, 'Patient'],
+        ['Lamia Hossain', '1000000017', 'patient017@nhre.demo', '+8801710001017', $demoPassword, 'Patient'],
+        ['Asif Mahmood', '1000000018', 'patient018@nhre.demo', '+8801710001018', $demoPassword, 'Patient'],
+        ['Mehnaz Chowdhury', '1000000019', 'patient019@nhre.demo', '+8801710001019', $demoPassword, 'Patient'],
+        ['Rakib Ahmed', '1000000020', 'patient020@nhre.demo', '+8801710001020', $demoPassword, 'Patient'],
+        ['Jannat Sultana', '1000000021', 'patient021@nhre.demo', '+8801710001021', $demoPassword, 'Patient'],
+        ['Ahsan Talukder', '1000000022', 'patient022@nhre.demo', '+8801710001022', $demoPassword, 'Patient'],
+        ['Farzana Begum', '1000000023', 'patient023@nhre.demo', '+8801710001023', $demoPassword, 'Patient'],
+        ['Maruf Islam', '1000000024', 'patient024@nhre.demo', '+8801710001024', $demoPassword, 'Patient'],
+        ['Zarin Noor', '1000000025', 'patient025@nhre.demo', '+8801710001025', $demoPassword, 'Patient'],
+        ['Dr. Mohammad Ashraf Karim', '0000000002', 'admin@nhre.gov', '+8801710002002', $demoPassword, 'Hospital Admin'],
+        ['Nusrat Jahan Chowdhury',   '0000000003', 'sysadmin@nhre.gov', '+8801710002003', $demoPassword, 'System Admin'],
+        ['Ahsanul Haque',            '0000000004', 'pharmacist@nhre.gov', '+8801710002004', $demoPassword, 'Pharmacist'],
+        ['Maksudul Islam',           '0000000005', 'lab@nhre.gov', '+8801710002005', $demoPassword, 'Lab Technician'],
     ];
 
     $pdo = db();

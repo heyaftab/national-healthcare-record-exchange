@@ -287,15 +287,18 @@ mysql -u root < database/nhre.sql
 
 Alternatively, import `database/nhre.sql` using phpMyAdmin.
 
-To create the demo accounts shown on the login page, run the seeder once after
-the database has been imported:
+To create the demo accounts shown on the login page, set `NHRE_DEMO_PASSWORD`
+to a private, unique password of at least 16 characters, then run the seeder
+once after the database has been imported:
 
 ```bash
 php scripts/seed_demo_accounts.php
 ```
 
 For a hosted deployment, run this command once with the app's database
-environment variables configured (for example, from a deployment shell).
+environment variables and `NHRE_DEMO_PASSWORD` configured (for example, from a
+deployment shell). Re-run it with a new private value to rotate any old seeded
+demo account passwords.
 Do not add it to the web request or the container startup command.
 
 ### 2️⃣ Check local database settings
@@ -334,6 +337,7 @@ The application reads database connection settings from environment variables. P
 | `DB_NAME` | Database name | `nhre` |
 | `DB_USER` | Database user | `root` |
 | `DB_PASS` | Database password | Empty |
+| `NHRE_DEMO_PASSWORD` | Private password used only when seeding demo accounts | Not set |
 | `NHRE_SESSION_STORAGE` | Set to `database` to persist sessions in MySQL | PHP session storage |
 | `NHRE_FILE_STORAGE` | Set to `database` to store uploads in MySQL | Local `uploads/` directory |
 
@@ -344,26 +348,12 @@ The application reads database connection settings from environment variables. P
 
 ## 🔑 Demo accounts
 
-The login page displays demo accounts that must be seeded once during setup with `php scripts/seed_demo_accounts.php`. Try the **[live demo](https://national-healthcare-record-exchange-production.up.railway.app/)** with any of these credentials:
+Demo accounts must be seeded once during setup with `php scripts/seed_demo_accounts.php`. Before seeding, set `NHRE_DEMO_PASSWORD` in the process environment to a private, unique password of at least 16 characters. The value is never displayed by the application or included in API responses. Do not commit or reuse it.
 
-<details open>
-<summary><b>👇 Seeded credentials (click to collapse)</b></summary>
-
-<br>
-
-| Role | Email | Password |
-| --- | --- | --- |
-| 🧑 Patient | `patient@nhre.gov` | `Patient123!` |
-| 👨‍⚕️ Doctor | `doctor001@nhre.dev` | `Doctor123!` |
-| 💊 Pharmacist | `pharmacist@nhre.gov` | `Pharmacist123!` |
-| 🔬 Laboratory Technician | `lab@nhre.gov` | `Lab123!` |
-| 🏥 Hospital Administrator | `admin@nhre.gov` | `Admin123!` |
-| 🛡️ System Administrator | `sysadmin@nhre.gov` | `SysAdmin123!` |
-
-</details>
+Try the **[live demo](https://national-healthcare-record-exchange-production.up.railway.app/)**. Demo account emails may be prefilled on the login page, but you must enter the private demo password configured by the deployment owner.
 
 > [!CAUTION]
-> These are public demonstration credentials. Do not expose a deployment with demo accounts or default credentials to real users or real patient data.
+> Demo accounts are for isolated demonstrations only. Do not enable or seed them in deployments containing real users or patient data. Rotate or remove any accounts seeded with earlier published demo passwords.
 
 <img src="assets/images/nhre-wave-divider.svg" width="100%" alt="">
 

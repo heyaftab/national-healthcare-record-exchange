@@ -48,7 +48,6 @@ try {
             'fullname' => $row['fullname'],
             'email' => $row['email'],
             'role' => $row['role'],
-            'password' => 'Patient123!',
         ];
     }
 

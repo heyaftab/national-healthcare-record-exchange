@@ -16,7 +16,6 @@ try {
         $accounts[] = [
             'fullname' => (string)$row['fullname'],
             'email' => $email,
-            'password' => 'Doctor123!',
         ];
     }
     echo json_encode($accounts, JSON_THROW_ON_ERROR);

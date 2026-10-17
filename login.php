@@ -7,12 +7,12 @@ $old = session_pull('old', []);
 $success = session_pull('success');
 $error = session_pull('error');
 $demo_accounts = [
-  ['role' => 'Patient', 'fullname' => 'Farhana Rahman', 'email' => 'patient@nhre.gov', 'password' => 'Patient123!', 'badge' => 'primary', 'seed' => 'patient-farhana-rahman'],
-  ['role' => 'Doctor', 'fullname' => 'Dr. Afsana Ahmed', 'email' => 'doctor001@nhre.dev', 'password' => 'Doctor123!', 'badge' => 'info', 'seed' => 'demo-doctor-001'],
-  ['role' => 'Pharmacist', 'fullname' => 'Ahsanul Haque', 'email' => 'pharmacist@nhre.gov', 'password' => 'Pharmacist123!', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
-  ['role' => 'Lab Technician', 'fullname' => 'Maksudul Islam', 'email' => 'lab@nhre.gov', 'password' => 'Lab123!', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
-  ['role' => 'Hospital Admin', 'fullname' => 'Dr. Mohammad Ashraf Karim', 'email' => 'admin@nhre.gov', 'password' => 'Admin123!', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
-  ['role' => 'System Admin', 'fullname' => 'Nusrat Jahan Chowdhury', 'email' => 'sysadmin@nhre.gov', 'password' => 'SysAdmin123!', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
+  ['role' => 'Patient', 'fullname' => 'Farhana Rahman', 'email' => 'patient@nhre.gov', 'badge' => 'primary', 'seed' => 'patient-farhana-rahman'],
+  ['role' => 'Doctor', 'fullname' => 'Dr. Afsana Ahmed', 'email' => 'doctor001@nhre.dev', 'badge' => 'info', 'seed' => 'demo-doctor-001'],
+  ['role' => 'Pharmacist', 'fullname' => 'Ahsanul Haque', 'email' => 'pharmacist@nhre.gov', 'badge' => 'success', 'seed' => 'demo-pharmacist'],
+  ['role' => 'Lab Technician', 'fullname' => 'Maksudul Islam', 'email' => 'lab@nhre.gov', 'badge' => 'warning', 'seed' => 'demo-lab-technician'],
+  ['role' => 'Hospital Admin', 'fullname' => 'Dr. Mohammad Ashraf Karim', 'email' => 'admin@nhre.gov', 'badge' => 'danger', 'seed' => 'demo-hospital-admin'],
+  ['role' => 'System Admin', 'fullname' => 'Nusrat Jahan Chowdhury', 'email' => 'sysadmin@nhre.gov', 'badge' => 'dark', 'seed' => 'demo-system-admin'],
 ];
 $demo_profile_photos = [];
 $demo_account_numbers = [];
@@ -194,7 +194,7 @@ function demo_profile_picture(array $account, array $photos): string
             <div class="demo-accounts-head">
               <span class="auth-kicker">Account access</span>
               <h3>Accounts</h3>
-              <p>Select an account and click <strong>Use</strong> to fill the login form.</p>
+              <p>Select an account and click <strong>Use</strong> to fill its email address.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-sm table-hover align-middle mb-0">
@@ -216,7 +216,7 @@ function demo_profile_picture(array $account, array $photos): string
                         <?= e($account['fullname']) ?>
                       </td>
                       <td class="font-monospace"><?= e($account['account_number'] ?? '—') ?></td>
-                      <td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm" data-email="<?= e($account['email']) ?>" data-password="<?= e($account['password']) ?>">Use</button></td>
+                      <td class="text-end"><button type="button" class="btn btn-demo-fill btn-sm" data-email="<?= e($account['email']) ?>">Use</button></td>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
@@ -234,17 +234,14 @@ function demo_profile_picture(array $account, array $photos): string
     document.querySelectorAll('.btn-demo-fill').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var email = document.getElementById('email');
-        var password = document.getElementById('password');
-        if (!email || !password) {
+        if (!email) {
           return;
         }
         email.value = btn.dataset.email;
-        password.value = btn.dataset.password;
         email.dispatchEvent(new Event('input', { bubbles: true }));
-        password.dispatchEvent(new Event('input', { bubbles: true }));
         document.querySelector('#loginForm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         email.focus();
-        window.nhreToast && nhreToast('Account credentials filled — you\u2019re ready to log in.');
+        window.nhreToast && nhreToast('Account email filled. Enter the private demo password to continue.');
       });
     });
 
